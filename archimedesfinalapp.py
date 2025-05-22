@@ -186,7 +186,8 @@ if uploaded_files:
 
     for i, (filename, _) in enumerate(histogram_data):
         label = dataset_labels[filename]
-        selected_shape = st.selectbox(f"Marker for {label}", list(marker_options.keys()), index=i % len(marker_options))
+        default_shape_index = 0 if len(uploaded_files) > 1 else (i % len(marker_options))
+        selected_shape = st.selectbox(f"Marker for {label}", list(marker_options.keys()), index=default_shape_index)
         dataset_markers[filename] = marker_options[selected_shape]
 
         selected_size = st.slider(f"Marker size for {label}", min_value=4, max_value=20, value=8)
@@ -212,7 +213,17 @@ if uploaded_files:
     bin_size = extract_bin_size(content)
     bar_width = bin_size * 0.95
 
+    st.subheader("Adjust Axis Limits")
+
+    x_min = st.number_input("X-axis min", value=0.0, step=0.1, format="%.2f")
+    x_max = st.number_input("X-axis max", value=10.0, step=0.1, format="%.2f")
+    y_min = st.number_input("Y-axis min", value=0.0, step=100000, format="%.0f")
+    y_max = st.number_input("Y-axis max", value=1e9, step=100000, format="%.0f")
+
     fig, ax = plt.subplots()
+
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
 
     for i, (filename, df) in enumerate(histogram_data):
         df_clean = df[~df['Bin Center'].astype(str).str.contains('<|>')]
@@ -255,16 +266,21 @@ if uploaded_files:
         marker = dataset_markers[filename]
         color = dataset_colors[filename]
         size = dataset_marker_sizes[filename]
-        handle = Line2D(
-            [0], [0],
-            marker=marker,
-            color='w',
-            markerfacecolor=color,
-            markeredgecolor=color,
-            markersize=size,
-            label=label,
-            linestyle='None'
-        )
+        if marker:
+    handle = Line2D(
+        [0], [0],
+        marker=marker,
+        color='w',
+        markerfacecolor=color,
+        markeredgecolor=color,
+        markersize=size,
+        label=label,
+        linestyle='None'
+            )
+        else:
+            from matplotlib.patches import Patch
+            handle = Patch(facecolor=color, edgecolor='black', label=label)
+
         custom_handles.append(handle)
 
     ax.legend(handles=custom_handles, title="Datasets")
