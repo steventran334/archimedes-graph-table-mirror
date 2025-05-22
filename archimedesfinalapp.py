@@ -133,7 +133,7 @@ if uploaded_files:
             "Experiment Duration [mm:ss]": convert_seconds_to_min_sec(extract_value(summary_data, "Experiment Duration [s]", 1, 2)),
             "# Particles Measured": extract_value(summary_data, "# Particles Measured", 1, 2),
             "# Particles Detected": extract_value(summary_data, "# Particles Detected", 1, 2),
-            "Limit of Detection [μm]": extract_value(summary_data, "Limit of Detection [μm]", 1, 2)
+            "Limit of Detection [μm]": extract_value(content[:idx_summary], "Limit of Detection [μm]", 1, 2),
         }
 
         all_summaries[dataset_labels[filename]] = summary_table
