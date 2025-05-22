@@ -213,17 +213,8 @@ if uploaded_files:
     bin_size = extract_bin_size(content)
     bar_width = bin_size * 0.95
 
-    st.subheader("Adjust Axis Limits")
-
-    x_min = st.number_input("X-axis min", value=0.0, step=0.1, format="%.2f")
-    x_max = st.number_input("X-axis max", value=10.0, step=0.1, format="%.2f")
-    y_min = st.number_input("Y-axis min", value=0.0, step=100000, format="%.0f")
-    y_max = st.number_input("Y-axis max", value=1e9, step=100000, format="%.0f")
-
     fig, ax = plt.subplots()
 
-    ax.set_xlim(x_min, x_max)
-    ax.set_ylim(y_min, y_max)
 
     for i, (filename, df) in enumerate(histogram_data):
         df_clean = df[~df['Bin Center'].astype(str).str.contains('<|>')]
