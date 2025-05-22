@@ -267,15 +267,15 @@ if uploaded_files:
         color = dataset_colors[filename]
         size = dataset_marker_sizes[filename]
         if marker:
-    handle = Line2D(
-        [0], [0],
-        marker=marker,
-        color='w',
-        markerfacecolor=color,
-        markeredgecolor=color,
-        markersize=size,
-        label=label,
-        linestyle='None'
+            handle = Line2D(
+                [0], [0],
+                marker=marker,
+                color='w',
+                markerfacecolor=color,
+                markeredgecolor=color,
+                markersize=size,
+                label=label,
+                linestyle='None'
             )
         else:
             from matplotlib.patches import Patch
