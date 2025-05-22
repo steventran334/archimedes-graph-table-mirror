@@ -33,7 +33,8 @@ st.markdown("""
 
 # --- Helpers ---
 def normalize(s):
-    return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("utf-8").strip().lower()
+    return unicodedata.normalize("NFKD", s.replace("μ", "u")).encode("ascii", "ignore").decode("utf-8").strip().lower()
+
 
 def extract_value(lines, key, key_index=1, value_index=2):
     norm_key = normalize(key)
