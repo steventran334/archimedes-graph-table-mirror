@@ -35,7 +35,6 @@ st.markdown("""
 def normalize(s):
     return unicodedata.normalize("NFKD", s.replace("μ", "u")).encode("ascii", "ignore").decode("utf-8").strip().lower()
 
-
 def extract_value(lines, key, key_index=1, value_index=2):
     norm_key = normalize(key)
     for line in lines:
@@ -134,7 +133,7 @@ if uploaded_files:
             "Experiment Duration [mm:ss]": convert_seconds_to_min_sec(extract_value(summary_data, "Experiment Duration [s]", 1, 2)),
             "# Particles Measured": extract_value(summary_data, "# Particles Measured", 1, 2),
             "# Particles Detected": extract_value(summary_data, "# Particles Detected", 1, 2),
-            "Limit of Detection [μm]": extract_value(content[:idx_summary], "Limit of Detection [μm]", 1, 2),
+            "Limit of Detection [μm]": extract_value(content, "Limit of Detection [μm]", 1, 2)
         }
 
         all_summaries[dataset_labels[filename]] = summary_table
