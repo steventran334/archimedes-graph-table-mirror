@@ -35,14 +35,17 @@ st.markdown("""
 def normalize(s):
     return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("utf-8").strip().lower()
 
-def extract_value(lines, key, key_index=1, value_index=3):
+def extract_value(lines, key, key_index=1, value_index=2):
     norm_key = normalize(key)
     for line in lines:
         parts = [x.strip() for x in line.split(',')]
-        if len(parts) > max(key_index, value_index):
-            if normalize(parts[key_index]) == norm_key:
+        if len(parts) > key_index and normalize(parts[key_index]) == norm_key:
+            if len(parts) > value_index and parts[value_index].strip():
                 return parts[value_index]
+            else:
+                return "(empty)"
     return "N/A"
+
 
 def find_index(lines, start_text):
     return next((i for i, line in enumerate(lines) if line.strip().startswith(start_text)), None)
@@ -130,7 +133,7 @@ if uploaded_files:
             "Experiment Duration [mm:ss]": convert_seconds_to_min_sec(extract_value(summary_data, "Experiment Duration [s]", 1, 2)),
             "# Particles Measured": extract_value(summary_data, "# Particles Measured", 1, 2),
             "# Particles Detected": extract_value(summary_data, "# Particles Detected", 1, 2),
-            "Limit of Detection [μm]": extract_value(summary_data, "Limit of Detection [μm]", 0, 2)
+            "Limit of Detection [μm]": extract_value(summary_data, "Limit of Detection [μm]", 1, 2)
         }
 
         all_summaries[dataset_labels[filename]] = summary_table
