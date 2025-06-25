@@ -368,14 +368,26 @@ if uploaded_files:
     st.markdown(href_csv, unsafe_allow_html=True)
 
     # --- Render summary table as vector figure (SVG) ---
-    summary_fig = render_table_as_figure(combined_summary)
+summary_fig = render_table_as_figure(combined_summary)
 
-    svg_table_buffer = BytesIO()
-    summary_fig.savefig(svg_table_buffer, format="svg", bbox_inches="tight")
-    svg_table_data = svg_table_buffer.getvalue()
-    b64_table_svg = base64.b64encode(svg_table_data).decode("utf-8")
+# Download as SVG (already in your code)
+svg_table_buffer = BytesIO()
+summary_fig.savefig(svg_table_buffer, format="svg", bbox_inches="tight")
+svg_table_data = svg_table_buffer.getvalue()
+b64_table_svg = base64.b64encode(svg_table_data).decode("utf-8")
 
-    st.markdown(
-        f'<a href="data:image/svg+xml;base64,{b64_table_svg}" download="summary_table.svg">📥 Download Summary Table (SVG)</a>',
-        unsafe_allow_html=True
-    )
+st.markdown(
+    f'<a href="data:image/svg+xml;base64,{b64_table_svg}" download="summary_table.svg">📥 Download Summary Table (SVG)</a>',
+    unsafe_allow_html=True
+)
+
+# --- Download Summary Table as PNG (screenshot-like) ---
+png_table_buffer = BytesIO()
+summary_fig.savefig(png_table_buffer, format="png", bbox_inches="tight", dpi=200)
+png_table_data = png_table_buffer.getvalue()
+b64_table_png = base64.b64encode(png_table_data).decode("utf-8")
+
+st.markdown(
+    f'<a href="data:image/png;base64,{b64_table_png}" download="summary_table.png">📸 Download Summary Table (PNG Screenshot)</a>',
+    unsafe_allow_html=True
+)
