@@ -286,53 +286,92 @@ if uploaded_files:
 
     # --- Line Graph of Particle Size Distributions ---
     st.subheader("Line Graph of Particle Size Distributions")
-    
-    st.markdown("Each dataset will be shown as a line plot. You can customize line style and width below.")
-    
-    # Let user choose line style and width
+
+    # User input for line graph title
+    line_plot_title = st.text_input(
+        "Enter a title for the line graph:",
+        value="Line Graph of Particle Size Distributions"
+    )
+
+    # Let user choose line style, width, and color for each dataset
     line_style_options = {
         "Solid": "-",
         "Dashed": "--",
         "Dotted": ":",
         "Dash-dot": "-."
     }
+    # You can use the same color_options as before, or define a new one
+    line_color_options = {
+        "Black": "#000000",
+        "Dark Gray": "#4D4D4D",
+        "Gray": "#7f7f7f",
+        "Light Gray": "#BFBFBF",
+        "Blue": "#1f77b4",
+        "Orange": "#ff7f0e",
+        "Green": "#2ca02c",
+        "Red": "#d62728",
+        "Purple": "#9467bd",
+        "Brown": "#8c564b",
+        "Pink": "#e377c2",
+        "Olive": "#bcbd22",
+        "Cyan": "#17becf"
+    }
     dataset_line_styles = {}
     dataset_line_widths = {}
-    
+    dataset_line_colors = {}
+
     for i, (filename, _) in enumerate(histogram_data):
         label = dataset_labels[filename]
         default_style = "Solid"
-        selected_style = st.selectbox(f"Line style for {label}", list(line_style_options.keys()), index=list(line_style_options.keys()).index(default_style))
+        selected_style = st.selectbox(
+            f"Line style for {label}",
+            list(line_style_options.keys()),
+            index=list(line_style_options.keys()).index(default_style),
+            key=f"line_style_{label}"
+        )
         dataset_line_styles[filename] = line_style_options[selected_style]
-    
-        selected_width = st.slider(f"Line width for {label}", min_value=1, max_value=6, value=2)
+
+        selected_width = st.slider(
+            f"Line width for {label}",
+            min_value=1, max_value=6, value=2,
+            key=f"line_width_{label}"
+        )
         dataset_line_widths[filename] = selected_width
-    
+
+        # Color selection for line graph
+        selected_color = st.selectbox(
+            f"Line color for {label}",
+            list(line_color_options.keys()),
+            index=i % len(line_color_options),
+            key=f"line_color_{label}"
+        )
+        dataset_line_colors[filename] = line_color_options[selected_color]
+
     line_fig, line_ax = plt.subplots()
-    
+
     for filename, df in histogram_data:
         df_clean = df[~df['Bin Center'].astype(str).str.contains('<|>')]
         df_clean = df_clean[['Bin Center', 'Average']].dropna()
         df_clean['Bin Center'] = pd.to_numeric(df_clean['Bin Center'], errors='coerce')
         df_clean['Average'] = pd.to_numeric(df_clean['Average'], errors='coerce')
-    
+
         line_ax.plot(
             df_clean['Bin Center'],
             df_clean['Average'],
             label=dataset_labels[filename],
-            color=dataset_colors[filename],
+            color=dataset_line_colors[filename],
             linestyle=dataset_line_styles[filename],
             linewidth=dataset_line_widths[filename],
             marker=dataset_markers[filename] if dataset_markers[filename] else None,
             markersize=dataset_marker_sizes[filename] if dataset_markers[filename] else None
         )
-    
+
     line_ax.set_xlabel("Diameter [μm]")
     line_ax.set_ylabel("Concentration [#/mL]")
-    line_ax.set_title("Line Graph of Particle Size Distributions")
+    line_ax.set_title(line_plot_title)
     line_ax.legend(title="Datasets")
     st.pyplot(line_fig)
-    
+
     # --- Download Line Graph as SVG ---
     svg_line_buffer = BytesIO()
     line_fig.savefig(svg_line_buffer, format="svg", bbox_inches="tight")
