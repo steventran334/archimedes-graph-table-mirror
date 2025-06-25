@@ -5,9 +5,7 @@ import base64
 from io import BytesIO, StringIO
 import io
 import unicodedata
-from matplotlib import pyplot as plt
 from matplotlib.table import Table
-
 
 st.set_page_config(layout="wide")
 
@@ -30,7 +28,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-
 # --- Helpers ---
 def normalize(s):
     return unicodedata.normalize("NFKD", s.replace("μ", "u")).encode("ascii", "ignore").decode("utf-8").strip().lower()
@@ -45,7 +42,6 @@ def extract_value(lines, key, key_index=1, value_index=2):
             else:
                 return "(empty)"
     return "N/A"
-
 
 def find_index(lines, start_text):
     return next((i for i, line in enumerate(lines) if line.strip().startswith(start_text)), None)
@@ -119,7 +115,6 @@ if uploaded_files:
                 return f"{minutes:02}:{seconds:02}"
             except:
                 return "N/A"
-
 
         summary_table = {
             "Mean [nm]": convert_um_to_nm(extract_value(real_stats, "Mean [μm]", 1, 3)),
@@ -196,7 +191,15 @@ if uploaded_files:
     st.subheader("Set Plot Title")
     plot_title = st.text_input("Enter a title for the histogram:", value="Overlaid Histogram with Touching Bars and Markers")
 
-    # --- Overlapping histograms with shape overlays ---
+    # --- Set Graph Window Size ---
+    st.subheader("Set Graph Window Size")
+    col1, col2 = st.columns(2)
+    with col1:
+        fig_width = st.slider("Figure width (inches)", min_value=4, max_value=20, value=10)
+    with col2:
+        fig_height = st.slider("Figure height (inches)", min_value=3, max_value=12, value=6)
+    figsize = (fig_width, fig_height)
+        # --- Overlapping histograms with shape overlays ---
     st.subheader("Overlapping Particle Size Distributions (Overlaid Histogram)")
 
     def extract_bin_size(lines):
@@ -213,8 +216,7 @@ if uploaded_files:
     bin_size = extract_bin_size(content)
     bar_width = bin_size * 0.95
 
-    fig, ax = plt.subplots()
-
+    fig, ax = plt.subplots(figsize=figsize)
 
     for i, (filename, df) in enumerate(histogram_data):
         df_clean = df[~df['Bin Center'].astype(str).str.contains('<|>')]
@@ -244,7 +246,6 @@ if uploaded_files:
                 color=dataset_colors[filename],
                 label="_nolegend_"
             )
-
 
     ax.set_xlabel("Diameter [μm]")
     ax.set_ylabel("Concentration [#/mL]")
@@ -308,7 +309,7 @@ if uploaded_files:
         selected_width = st.slider(f"Line width for {label}", min_value=1, max_value=6, value=2)
         dataset_line_widths[filename] = selected_width
     
-    line_fig, line_ax = plt.subplots()
+    line_fig, line_ax = plt.subplots(figsize=figsize)
     
     for filename, df in histogram_data:
         df_clean = df[~df['Bin Center'].astype(str).str.contains('<|>')]
@@ -341,7 +342,6 @@ if uploaded_files:
     href_line_svg = f'<a href="data:image/svg+xml;base64,{b64_line_svg}" download="line_graph.svg">📥 Download Line Graph (SVG)</a>'
     st.markdown(href_line_svg, unsafe_allow_html=True)
 
-    
     # --- Combine Summary Tables Side-by-Side ---
     combined_summary = pd.DataFrame(all_summaries)
     st.subheader("Summary Table Comparison")
