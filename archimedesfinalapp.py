@@ -340,7 +340,7 @@ if uploaded_files:
             markersize=dataset_marker_sizes[filename] if dataset_markers[filename] else None
         )
 
-    line_ax.set_xlabel("Diameter [풮m]")
+    line_ax.set_xlabel("Diameter [µm]")
     line_ax.set_ylabel("Concentration [#/mL]")
     line_ax.set_title(line_plot_title)
     line_ax.legend(title="Datasets")
