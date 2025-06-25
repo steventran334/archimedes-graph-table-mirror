@@ -8,7 +8,6 @@ import unicodedata
 from matplotlib import pyplot as plt
 from matplotlib.table import Table
 
-
 st.set_page_config(layout="wide")
 
 st.title("Archimedes to CSV")
@@ -30,7 +29,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-
 # --- Helpers ---
 def normalize(s):
     return unicodedata.normalize("NFKD", s.replace("μ", "u")).encode("ascii", "ignore").decode("utf-8").strip().lower()
@@ -45,7 +43,6 @@ def extract_value(lines, key, key_index=1, value_index=2):
             else:
                 return "(empty)"
     return "N/A"
-
 
 def find_index(lines, start_text):
     return next((i for i, line in enumerate(lines) if line.strip().startswith(start_text)), None)
@@ -120,7 +117,6 @@ if uploaded_files:
             except:
                 return "N/A"
 
-
         summary_table = {
             "Mean [nm]": convert_um_to_nm(extract_value(real_stats, "Mean [μm]", 1, 3)),
             "Stdev [nm]": convert_um_to_nm(extract_value(real_stats, "Stdev [μm]", 1, 3)),
@@ -157,14 +153,6 @@ if uploaded_files:
             key=f"color_{label}"
         )
         dataset_colors[filename] = selected_color
-
-
-    for i, (filename, _) in enumerate(histogram_data):
-        available_colors = [name for name in color_names if color_options[name] not in used_colors]
-        default = available_colors[i % len(available_colors)]
-        selected = st.selectbox(f"Color for {dataset_labels[filename]}", available_colors, index=available_colors.index(default))
-        dataset_colors[filename] = color_options[selected]
-        used_colors.add(color_options[selected])
 
     # Let user choose marker shape
     st.subheader("Choose Marker Shape for Each Dataset")
@@ -212,7 +200,6 @@ if uploaded_files:
 
     fig, ax = plt.subplots()
 
-
     for i, (filename, df) in enumerate(histogram_data):
         df_clean = df[~df['Bin Center'].astype(str).str.contains('<|>')]
         df_clean = df_clean[['Bin Center', 'Average']].dropna()
@@ -223,7 +210,7 @@ if uploaded_files:
         ax.bar(
             df_clean['Bin Center'],
             df_clean['Average'],
-            width=bar_width,
+                    width=bar_width,
             label=dataset_labels[filename],
             alpha=0.5,
             align='center',
@@ -231,7 +218,7 @@ if uploaded_files:
         )
         # Overlay markers if selected
         marker_shape = dataset_markers[filename]
-        if marker_shape:  # None or empty string means skip
+        if marker_shape:
             ax.plot(
                 df_clean['Bin Center'],
                 df_clean['Average'],
@@ -241,7 +228,6 @@ if uploaded_files:
                 color=dataset_colors[filename],
                 label="_nolegend_"
             )
-
 
     ax.set_xlabel("Diameter [μm]")
     ax.set_ylabel("Concentration [#/mL]")
@@ -268,11 +254,11 @@ if uploaded_files:
         else:
             from matplotlib.patches import Patch
             handle = Patch(facecolor=color, edgecolor='black', label=label)
-
         custom_handles.append(handle)
 
     ax.legend(handles=custom_handles, title="Datasets")
     st.pyplot(fig)
+
     # --- Download Histogram as SVG ---
     svg_buffer = BytesIO()
     fig.savefig(svg_buffer, format="svg", bbox_inches="tight")
@@ -281,7 +267,7 @@ if uploaded_files:
     href_svg = f'<a href="data:image/svg+xml;base64,{b64_svg}" download="histogram.svg">📥 Download Histogram (SVG)</a>'
     st.markdown(href_svg, unsafe_allow_html=True)
 
-       # --- Line Graph of Particle Size Distributions ---
+    # --- Line Graph of Particle Size Distributions ---
     st.subheader("Line Graph of Particle Size Distributions")
 
     # User input for line graph title
@@ -330,14 +316,14 @@ if uploaded_files:
             df_clean['Bin Center'],
             df_clean['Average'],
             label=dataset_labels[filename],
-            color=dataset_colors[filename],  # <-- Use the same color as the bar graph
+            color=dataset_colors[filename],
             linestyle=dataset_line_styles[filename],
             linewidth=dataset_line_widths[filename],
             marker=dataset_markers[filename] if dataset_markers[filename] else None,
             markersize=dataset_marker_sizes[filename] if dataset_markers[filename] else None
         )
 
-    line_ax.set_xlabel("Diameter [µm]")
+    line_ax.set_xlabel("Diameter [μm]")
     line_ax.set_ylabel("Concentration [#/mL]")
     line_ax.set_title(line_plot_title)
     line_ax.legend(title="Datasets")
@@ -351,7 +337,6 @@ if uploaded_files:
     href_line_svg = f'<a href="data:image/svg+xml;base64,{b64_line_svg}" download="line_graph.svg">📥 Download Line Graph (SVG)</a>'
     st.markdown(href_line_svg, unsafe_allow_html=True)
 
-    
     # --- Combine Summary Tables Side-by-Side ---
     combined_summary = pd.DataFrame(all_summaries)
     st.subheader("Summary Table Comparison")
@@ -365,26 +350,26 @@ if uploaded_files:
     st.markdown(href_csv, unsafe_allow_html=True)
 
     # --- Render summary table as vector figure (SVG) ---
-summary_fig = render_table_as_figure(combined_summary)
+    summary_fig = render_table_as_figure(combined_summary)
 
-# Download as SVG (already in your code)
-svg_table_buffer = BytesIO()
-summary_fig.savefig(svg_table_buffer, format="svg", bbox_inches="tight")
-svg_table_data = svg_table_buffer.getvalue()
-b64_table_svg = base64.b64encode(svg_table_data).decode("utf-8")
+    # Download as SVG
+    svg_table_buffer = BytesIO()
+    summary_fig.savefig(svg_table_buffer, format="svg", bbox_inches="tight")
+    svg_table_data = svg_table_buffer.getvalue()
+    b64_table_svg = base64.b64encode(svg_table_data).decode("utf-8")
 
-st.markdown(
-    f'<a href="data:image/svg+xml;base64,{b64_table_svg}" download="summary_table.svg">📥 Download Summary Table (SVG)</a>',
-    unsafe_allow_html=True
-)
+    st.markdown(
+        f'<a href="data:image/svg+xml;base64,{b64_table_svg}" download="summary_table.svg">📥 Download Summary Table (SVG)</a>',
+        unsafe_allow_html=True
+    )
 
-# --- Download Summary Table as PNG (screenshot-like) ---
-png_table_buffer = BytesIO()
-summary_fig.savefig(png_table_buffer, format="png", bbox_inches="tight", dpi=200)
-png_table_data = png_table_buffer.getvalue()
-b64_table_png = base64.b64encode(png_table_data).decode("utf-8")
+    # --- Download Summary Table as PNG (screenshot-like) ---
+    png_table_buffer = BytesIO()
+    summary_fig.savefig(png_table_buffer, format="png", bbox_inches="tight", dpi=200)
+    png_table_data = png_table_buffer.getvalue()
+    b64_table_png = base64.b64encode(png_table_data).decode("utf-8")
 
-st.markdown(
-    f'<a href="data:image/png;base64,{b64_table_png}" download="summary_table.png">📸 Download Summary Table (PNG Screenshot)</a>',
-    unsafe_allow_html=True
-)
+    st.markdown(
+        f'<a href="data:image/png;base64,{b64_table_png}" download="summary_table.png">📸 Download Summary Table (PNG Screenshot)</a>',
+        unsafe_allow_html=True
+    )
