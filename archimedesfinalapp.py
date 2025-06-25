@@ -139,28 +139,25 @@ if uploaded_files:
 
         all_summaries[dataset_labels[filename]] = summary_table
 
-    # Let user choose from predefined color options
+    # Let user choose any color for each dataset, with custom cycling defaults
     st.subheader("Choose Colors for Each Dataset")
-    color_options = {
-        "Black": "#000000",
-        "Dark Gray": "#4D4D4D",
-        "Gray": "#7f7f7f",
-        "Light Gray": "#BFBFBF",
-        "Blue": "#1f77b4",
-        "Orange": "#ff7f0e",
-        "Green": "#2ca02c",
-        "Red": "#d62728",
-        "Purple": "#9467bd",
-        "Brown": "#8c564b",
-        "Pink": "#e377c2",
-        "Olive": "#bcbd22",
-        "Cyan": "#17becf"
-    }
 
-    color_names = list(color_options.keys())
+    # List of default colors to cycle through: black, blue, red, green
+    default_colors = ["#000000", "#1f77b4", "#d62728", "#2ca02c"]
 
     dataset_colors = {}
-    used_colors = set()
+
+    for i, (filename, _) in enumerate(histogram_data):
+        label = dataset_labels[filename]
+        # Cycle through the default colors for the first datasets, then repeat if needed
+        default_color = default_colors[i % len(default_colors)]
+        selected_color = st.color_picker(
+            f"Color for {label}",
+            value=default_color,
+            key=f"color_{label}"
+        )
+        dataset_colors[filename] = selected_color
+
 
     for i, (filename, _) in enumerate(histogram_data):
         available_colors = [name for name in color_names if color_options[name] not in used_colors]
