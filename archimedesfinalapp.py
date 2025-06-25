@@ -136,7 +136,7 @@ if uploaded_files:
         all_summaries[dataset_labels[filename]] = summary_table
 
     # Let user choose any color for each dataset, with custom cycling defaults
-        st.subheader("Choose Colors for Each Dataset")
+    st.subheader("Choose Colors for Each Dataset")
 
     # List of generic color names and their hex codes
     generic_colors = {
