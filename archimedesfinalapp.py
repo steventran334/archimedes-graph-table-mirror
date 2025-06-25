@@ -284,7 +284,7 @@ if uploaded_files:
     href_svg = f'<a href="data:image/svg+xml;base64,{b64_svg}" download="histogram.svg">📥 Download Histogram (SVG)</a>'
     st.markdown(href_svg, unsafe_allow_html=True)
 
-    # --- Line Graph of Particle Size Distributions ---
+       # --- Line Graph of Particle Size Distributions ---
     st.subheader("Line Graph of Particle Size Distributions")
 
     # User input for line graph title
@@ -293,32 +293,15 @@ if uploaded_files:
         value="Line Graph of Particle Size Distributions"
     )
 
-    # Let user choose line style, width, and color for each dataset
+    # Let user choose line style and width for each dataset
     line_style_options = {
         "Solid": "-",
         "Dashed": "--",
         "Dotted": ":",
         "Dash-dot": "-."
     }
-    # You can use the same color_options as before, or define a new one
-    line_color_options = {
-        "Black": "#000000",
-        "Dark Gray": "#4D4D4D",
-        "Gray": "#7f7f7f",
-        "Light Gray": "#BFBFBF",
-        "Blue": "#1f77b4",
-        "Orange": "#ff7f0e",
-        "Green": "#2ca02c",
-        "Red": "#d62728",
-        "Purple": "#9467bd",
-        "Brown": "#8c564b",
-        "Pink": "#e377c2",
-        "Olive": "#bcbd22",
-        "Cyan": "#17becf"
-    }
     dataset_line_styles = {}
     dataset_line_widths = {}
-    dataset_line_colors = {}
 
     for i, (filename, _) in enumerate(histogram_data):
         label = dataset_labels[filename]
@@ -338,15 +321,6 @@ if uploaded_files:
         )
         dataset_line_widths[filename] = selected_width
 
-        # Color selection for line graph
-        selected_color = st.selectbox(
-            f"Line color for {label}",
-            list(line_color_options.keys()),
-            index=i % len(line_color_options),
-            key=f"line_color_{label}"
-        )
-        dataset_line_colors[filename] = line_color_options[selected_color]
-
     line_fig, line_ax = plt.subplots()
 
     for filename, df in histogram_data:
@@ -359,14 +333,14 @@ if uploaded_files:
             df_clean['Bin Center'],
             df_clean['Average'],
             label=dataset_labels[filename],
-            color=dataset_line_colors[filename],
+            color=dataset_colors[filename],  # <-- Use the same color as the bar graph
             linestyle=dataset_line_styles[filename],
             linewidth=dataset_line_widths[filename],
             marker=dataset_markers[filename] if dataset_markers[filename] else None,
             markersize=dataset_marker_sizes[filename] if dataset_markers[filename] else None
         )
 
-    line_ax.set_xlabel("Diameter [μm]")
+    line_ax.set_xlabel("Diameter [풮m]")
     line_ax.set_ylabel("Concentration [#/mL]")
     line_ax.set_title(line_plot_title)
     line_ax.legend(title="Datasets")
