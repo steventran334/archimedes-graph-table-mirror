@@ -136,23 +136,41 @@ if uploaded_files:
         all_summaries[dataset_labels[filename]] = summary_table
 
     # Let user choose any color for each dataset, with custom cycling defaults
-    st.subheader("Choose Colors for Each Dataset")
+        st.subheader("Choose Colors for Each Dataset")
 
-    # List of default colors to cycle through: black, blue, red, green
-    default_colors = ["#000000", "#1f77b4", "#d62728", "#2ca02c"]
+    # List of generic color names and their hex codes
+    generic_colors = {
+        "Black": "#000000",
+        "Blue": "#1f77b4",
+        "Red": "#d62728",
+        "Green": "#2ca02c",
+        "Orange": "#ff7f0e",
+        "Purple": "#9467bd",
+        "Brown": "#8c564b",
+        "Pink": "#e377c2",
+        "Olive": "#bcbd22",
+        "Cyan": "#17becf",
+        "Gray": "#7f7f7f",
+        "Light Gray": "#BFBFBF",
+        "Dark Gray": "#4D4D4D"
+    }
+    generic_color_names = list(generic_colors.keys())
+    default_cycle = ["Black", "Blue", "Red", "Green"]
 
     dataset_colors = {}
 
     for i, (filename, _) in enumerate(histogram_data):
         label = dataset_labels[filename]
-        # Cycle through the default colors for the first datasets, then repeat if needed
-        default_color = default_colors[i % len(default_colors)]
-        selected_color = st.color_picker(
+        # Cycle through Black, Blue, Red, Green as defaults
+        default_color_name = default_cycle[i % len(default_cycle)]
+        selected_color_name = st.selectbox(
             f"Color for {label}",
-            value=default_color,
+            generic_color_names,
+            index=generic_color_names.index(default_color_name),
             key=f"color_{label}"
         )
-        dataset_colors[filename] = selected_color
+        dataset_colors[filename] = generic_colors[selected_color_name]
+
 
     # Let user choose marker shape
     st.subheader("Choose Marker Shape for Each Dataset")
