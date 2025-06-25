@@ -284,62 +284,62 @@ if uploaded_files:
     href_svg = f'<a href="data:image/svg+xml;base64,{b64_svg}" download="histogram.svg">📥 Download Histogram (SVG)</a>'
     st.markdown(href_svg, unsafe_allow_html=True)
 
-    # --- Line Graph of Particle Size Distributions ---
-    st.subheader("Line Graph of Particle Size Distributions")
+# --- Line Graph of Particle Size Distributions ---
+st.subheader("Line Graph of Particle Size Distributions")
 
-    st.markdown("Each dataset will be shown as a line plot. You can customize line style and width below.")
+st.markdown("Each dataset will be shown as a line plot. You can customize line style and width below.")
 
-    # Let user choose line style and width
-    line_style_options = {
-        "Solid": "-",
-        "Dashed": "--",
-        "Dotted": ":",
-        "Dash-dot": "-."
-    }
-    dataset_line_styles = {}
-    dataset_line_widths = {}
+# Let user choose line style and width
+line_style_options = {
+    "Solid": "-",
+    "Dashed": "--",
+    "Dotted": ":",
+    "Dash-dot": "-."
+}
+dataset_line_styles = {}
+dataset_line_widths = {}
 
-    for i, (filename, _) in enumerate(histogram_data):
-        label = dataset_labels[filename]
-        default_style = "Solid"
-        selected_style = st.selectbox(f"Line style for {label}", list(line_style_options.keys()), index=list(line_style_options.keys()).index(default_style))
-        dataset_line_styles[filename] = line_style_options[selected_style]
+for i, (filename, _) in enumerate(histogram_data):
+    label = dataset_labels[filename]
+    default_style = "Solid"
+    selected_style = st.selectbox(f"Line style for {label}", list(line_style_options.keys()), index=list(line_style_options.keys()).index(default_style))
+    dataset_line_styles[filename] = line_style_options[selected_style]
 
-        selected_width = st.slider(f"Line width for {label}", min_value=1, max_value=6, value=2)
-        dataset_line_widths[filename] = selected_width
+    selected_width = st.slider(f"Line width for {label}", min_value=1, max_value=6, value=2)
+    dataset_line_widths[filename] = selected_width
 
-    line_fig, line_ax = plt.subplots()
+line_fig, line_ax = plt.subplots()
 
-    for filename, df in histogram_data:
-        df_clean = df[~df['Bin Center'].astype(str).str.contains('<|>')]
-        df_clean = df_clean[['Bin Center', 'Average']].dropna()
-        df_clean['Bin Center'] = pd.to_numeric(df_clean['Bin Center'], errors='coerce')
-        df_clean['Average'] = pd.to_numeric(df_clean['Average'], errors='coerce')
+for filename, df in histogram_data:
+    df_clean = df[~df['Bin Center'].astype(str).str.contains('<|>')]
+    df_clean = df_clean[['Bin Center', 'Average']].dropna()
+    df_clean['Bin Center'] = pd.to_numeric(df_clean['Bin Center'], errors='coerce')
+    df_clean['Average'] = pd.to_numeric(df_clean['Average'], errors='coerce')
 
-        line_ax.plot(
-            df_clean['Bin Center'],
-            df_clean['Average'],
-            label=dataset_labels[filename],
-            color=dataset_colors[filename],
-            linestyle=dataset_line_styles[filename],
-            linewidth=dataset_line_widths[filename],
-            marker=dataset_markers[filename] if dataset_markers[filename] else None,
-            markersize=dataset_marker_sizes[filename] if dataset_markers[filename] else None
-        )
+    line_ax.plot(
+        df_clean['Bin Center'],
+        df_clean['Average'],
+        label=dataset_labels[filename],
+        color=dataset_colors[filename],
+        linestyle=dataset_line_styles[filename],
+        linewidth=dataset_line_widths[filename],
+        marker=dataset_markers[filename] if dataset_markers[filename] else None,
+        markersize=dataset_marker_sizes[filename] if dataset_markers[filename] else None
+    )
 
-    line_ax.set_xlabel("Diameter [μm]")
-    line_ax.set_ylabel("Concentration [#/mL]")
-    line_ax.set_title("Line Graph of Particle Size Distributions")
-    line_ax.legend(title="Datasets")
-    st.pyplot(line_fig)
+line_ax.set_xlabel("Diameter [μm]")
+line_ax.set_ylabel("Concentration [#/mL]")
+line_ax.set_title("Line Graph of Particle Size Distributions")
+line_ax.legend(title="Datasets")
+st.pyplot(line_fig)
 
-    # --- Download Line Graph as SVG ---
-    svg_line_buffer = BytesIO()
-    line_fig.savefig(svg_line_buffer, format="svg", bbox_inches="tight")
-    svg_line_data = svg_line_buffer.getvalue()
-    b64_line_svg = base64.b64encode(svg_line_data).decode("utf-8")
-    href_line_svg = f'<a href="data:image/svg+xml;base64,{b64_line_svg}" download="line_graph.svg">📥 Download Line Graph (SVG)</a>'
-    st.markdown(href_line_svg, unsafe_allow_html=True)
+# --- Download Line Graph as SVG ---
+svg_line_buffer = BytesIO()
+line_fig.savefig(svg_line_buffer, format="svg", bbox_inches="tight")
+svg_line_data = svg_line_buffer.getvalue()
+b64_line_svg = base64.b64encode(svg_line_data).decode("utf-8")
+href_line_svg = f'<a href="data:image/svg+xml;base64,{b64_line_svg}" download="line_graph.svg">📥 Download Line Graph (SVG)</a>'
+st.markdown(href_line_svg, unsafe_allow_html=True)
 
     
     # --- Combine Summary Tables Side-by-Side ---
