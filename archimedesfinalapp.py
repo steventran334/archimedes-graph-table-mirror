@@ -287,12 +287,10 @@ if uploaded_files:
 
     # --- Line Graph of Particle Size Distributions ---
     st.subheader("Line Graph of Particle Size Distributions")
+    
+    # Use the same title as the histogram
+    line_plot_title = plot_title
 
-    # User input for line graph title
-    line_plot_title = st.text_input(
-        "Enter a title for the line graph:",
-        value="Line Graph of Particle Size Distributions"
-    )
 
     # Let user choose line style and width for each dataset
     line_style_options = {
