@@ -155,7 +155,7 @@ if uploaded_files:
         "Dark Gray": "#4D4D4D"
     }
     generic_color_names = list(generic_colors.keys())
-    default_cycle = ["Black", "Red", "Green", "Blue"]
+    default_cycle = ["Black", "Red", "Green", "Blue", "Purple", "Pink", "Cyan"]
 
     dataset_colors = {}
 
