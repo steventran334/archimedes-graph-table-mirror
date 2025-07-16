@@ -197,7 +197,7 @@ if uploaded_files:
         dataset_marker_sizes[filename] = selected_size
 
     st.subheader("Set Plot Title")
-    plot_title = st.text_input("Enter a title for the histogram:", value="Overlaid Histogram with Touching Bars and Markers")
+    plot_title = st.text_input("Enter a title for the histogram:", value=" ")
 
     # --- Overlapping histograms with shape overlays ---
     st.subheader(" ")
