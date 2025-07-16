@@ -200,7 +200,7 @@ if uploaded_files:
     plot_title = st.text_input("Enter a title for the histogram:", value="Overlaid Histogram with Touching Bars and Markers")
 
     # --- Overlapping histograms with shape overlays ---
-    st.subheader("Overlapping Particle Size Distributions (Overlaid Histogram)")
+    st.subheader(" ")
 
     def extract_bin_size(lines):
         for line in lines:
