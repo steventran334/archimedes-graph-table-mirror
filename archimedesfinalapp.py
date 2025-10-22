@@ -29,11 +29,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-
 # --- Helpers ---
 def normalize(s):
     return unicodedata.normalize("NFKD", s.replace("μ", "u")).encode("ascii", "ignore").decode("utf-8").strip().lower()
-
 
 def extract_value(lines, key, key_index=1, value_index=2):
     norm_key = normalize(key)
@@ -46,10 +44,8 @@ def extract_value(lines, key, key_index=1, value_index=2):
                 return "(empty)"
     return "N/A"
 
-
 def find_index(lines, start_text):
     return next((i for i, line in enumerate(lines) if line.strip().startswith(start_text)), None)
-
 
 def render_table_as_figure(df, title="Summary Table", col_width=3.0, row_height=0.625, font_size=14):
     fig, ax = plt.subplots(figsize=(col_width * (df.shape[1] + 1), row_height * (df.shape[0] + 1)))
@@ -66,47 +62,22 @@ def render_table_as_figure(df, title="Summary Table", col_width=3.0, row_height=
     mpl_table.scale(1.2, 1.2)
     return fig
 
-
 # --- Upload multiple CSVs ---
 uploaded_files = st.file_uploader("Upload one or more CSV files", type="csv", accept_multiple_files=True)
 
 if uploaded_files:
-
-    ### NEW: Reorder section
-    st.subheader("Reorder Uploaded Files")
-    file_df = pd.DataFrame({"Filename": [f.name for f in uploaded_files]})
-
-    reordered_df = st.data_editor(
-        file_df,
-        num_rows="fixed",
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Filename": st.column_config.TextColumn(
-                "Filename",
-                help="Drag rows to change file order.",
-            )
-        }
-    )
-
-    ordered_names = reordered_df["Filename"].tolist()
-    name_to_file = {f.name: f for f in uploaded_files}
-    ordered_files = [name_to_file[name] for name in ordered_names]
-
-    ### END NEW
-
     all_summaries = {}
     histogram_data = []
     dataset_labels = {}
 
     st.subheader("Customize Dataset Names")
-    for uploaded_file in ordered_files:
+    for uploaded_file in uploaded_files:
         filename = uploaded_file.name
         default_label = filename.rsplit(".", 1)[0]
         user_label = st.text_input(f"Label for {filename}", value=default_label)
         dataset_labels[filename] = user_label
 
-    for uploaded_file in ordered_files:
+    for uploaded_file in uploaded_files:
         filename = uploaded_file.name
         content = uploaded_file.read().decode("utf-8").splitlines()
 
@@ -167,6 +138,7 @@ if uploaded_files:
     # Let user choose any color for each dataset, with custom cycling defaults
     st.subheader("Choose Colors for Each Dataset")
 
+    # List of generic color names and their hex codes
     generic_colors = {
         "Black": "#000000",
         "Blue": "#1f77b4",
@@ -186,8 +158,10 @@ if uploaded_files:
     default_cycle = ["Black", "Red", "Green", "Blue", "Purple", "Orange", "Cyan"]
 
     dataset_colors = {}
+
     for i, (filename, _) in enumerate(histogram_data):
         label = dataset_labels[filename]
+        # Cycle through Black, Blue, Red, Green as defaults
         default_color_name = default_cycle[i % len(default_cycle)]
         selected_color_name = st.selectbox(
             f"Color for {label}",
@@ -196,6 +170,7 @@ if uploaded_files:
             key=f"color_{label}"
         )
         dataset_colors[filename] = generic_colors[selected_color_name]
+
 
     # Let user choose marker shape
     st.subheader("Choose Marker Shape for Each Dataset")
@@ -209,14 +184,15 @@ if uploaded_files:
         "X": 'x',
         "Plus": '+'
     }
-
     dataset_markers = {}
     dataset_marker_sizes = {}
 
     for i, (filename, _) in enumerate(histogram_data):
         label = dataset_labels[filename]
-        selected_shape = st.selectbox(f"Marker for {label}", list(marker_options.keys()), index=0)
+        default_shape_index = 0 if len(uploaded_files) > 1 else (i % len(marker_options))
+        selected_shape = st.selectbox(f"Marker for {label}", list(marker_options.keys()), index=default_shape_index)
         dataset_markers[filename] = marker_options[selected_shape]
+
         selected_size = st.slider(f"Marker size for {label}", min_value=4, max_value=20, value=8)
         dataset_marker_sizes[filename] = selected_size
 
@@ -248,16 +224,17 @@ if uploaded_files:
         df_clean['Bin Center'] = pd.to_numeric(df_clean['Bin Center'], errors='coerce')
         df_clean['Average'] = pd.to_numeric(df_clean['Average'], errors='coerce')
 
+        # Plot bars
         ax.bar(
             df_clean['Bin Center'],
             df_clean['Average'],
-            width=bar_width,
+                    width=bar_width,
             label=dataset_labels[filename],
             alpha=0.5,
             align='center',
             color=dataset_colors[filename]
         )
-
+        # Overlay markers if selected
         marker_shape = dataset_markers[filename]
         if marker_shape:
             ax.plot(
@@ -300,30 +277,42 @@ if uploaded_files:
     ax.legend(handles=custom_handles, title="Datasets")
     st.pyplot(fig)
 
+    # --- Download Histogram as SVG ---
     svg_buffer = BytesIO()
     fig.savefig(svg_buffer, format="svg", bbox_inches="tight")
-    b64_svg = base64.b64encode(svg_buffer.getvalue()).decode("utf-8")
-    st.markdown(
-        f'<a href="data:image/svg+xml;base64,{b64_svg}" download="histogram.svg">📥 Download Histogram (SVG)</a>',
-        unsafe_allow_html=True
-    )
+    svg_data = svg_buffer.getvalue()
+    b64_svg = base64.b64encode(svg_data).decode("utf-8")
+    href_svg = f'<a href="data:image/svg+xml;base64,{b64_svg}" download="histogram.svg">📥 Download Histogram (SVG)</a>'
+    st.markdown(href_svg, unsafe_allow_html=True)
 
-    # --- Line Graph ---
+    # --- Line Graph of Particle Size Distributions ---
     st.subheader("Line Graph of Particle Size Distributions")
+    
+    # Use the same title as the histogram
+    line_plot_title = plot_title
 
-    line_style_options = {"Solid": "-", "Dashed": "--", "Dotted": ":", "Dash-dot": "-."}
+
+    # Let user choose line style and width for each dataset
+    line_style_options = {
+        "Solid": "-",
+        "Dashed": "--",
+        "Dotted": ":",
+        "Dash-dot": "-."
+    }
     dataset_line_styles = {}
     dataset_line_widths = {}
 
-    for filename, _ in histogram_data:
+    for i, (filename, _) in enumerate(histogram_data):
         label = dataset_labels[filename]
+        default_style = "Solid"
         selected_style = st.selectbox(
             f"Line style for {label}",
             list(line_style_options.keys()),
-            index=0,
+            index=list(line_style_options.keys()).index(default_style),
             key=f"line_style_{label}"
         )
         dataset_line_styles[filename] = line_style_options[selected_style]
+
         selected_width = st.slider(
             f"Line width for {label}",
             min_value=1, max_value=6, value=2,
@@ -332,8 +321,13 @@ if uploaded_files:
         dataset_line_widths[filename] = selected_width
 
     line_fig, line_ax = plt.subplots()
+
     for filename, df in histogram_data:
-        df_clean = df[['Bin Center', 'Average']].dropna()
+        df_clean = df[~df['Bin Center'].astype(str).str.contains('<|>')]
+        df_clean = df_clean[['Bin Center', 'Average']].dropna()
+        df_clean['Bin Center'] = pd.to_numeric(df_clean['Bin Center'], errors='coerce')
+        df_clean['Average'] = pd.to_numeric(df_clean['Average'], errors='coerce')
+
         line_ax.plot(
             df_clean['Bin Center'],
             df_clean['Average'],
@@ -347,43 +341,50 @@ if uploaded_files:
 
     line_ax.set_xlabel("Diameter [μm]")
     line_ax.set_ylabel("Concentration [#/mL]")
-    line_ax.set_title(plot_title)
+    line_ax.set_title(line_plot_title)
     line_ax.legend(title="Datasets")
     st.pyplot(line_fig)
 
+    # --- Download Line Graph as SVG ---
     svg_line_buffer = BytesIO()
     line_fig.savefig(svg_line_buffer, format="svg", bbox_inches="tight")
-    b64_line_svg = base64.b64encode(svg_line_buffer.getvalue()).decode("utf-8")
-    st.markdown(
-        f'<a href="data:image/svg+xml;base64,{b64_line_svg}" download="line_graph.svg">📥 Download Line Graph (SVG)</a>',
-        unsafe_allow_html=True
-    )
+    svg_line_data = svg_line_buffer.getvalue()
+    b64_line_svg = base64.b64encode(svg_line_data).decode("utf-8")
+    href_line_svg = f'<a href="data:image/svg+xml;base64,{b64_line_svg}" download="line_graph.svg">📥 Download Line Graph (SVG)</a>'
+    st.markdown(href_line_svg, unsafe_allow_html=True)
 
-    # --- Summary Table ---
+    # --- Combine Summary Tables Side-by-Side ---
     combined_summary = pd.DataFrame(all_summaries)
     st.subheader("Summary Table Comparison")
     st.dataframe(combined_summary, use_container_width=True)
 
+    # --- Download Summary Table as CSV ---
     csv_buffer = StringIO()
     combined_summary.to_csv(csv_buffer)
     b64_csv = base64.b64encode(csv_buffer.getvalue().encode()).decode("utf-8")
-    st.markdown(
-        f'<a href="data:file/csv;base64,{b64_csv}" download="summary_table.csv">📥 Download Summary Table (CSV)</a>',
-        unsafe_allow_html=True
-    )
+    href_csv = f'<a href="data:file/csv;base64,{b64_csv}" download="summary_table.csv">📥 Download Summary Table (CSV)</a>'
+    st.markdown(href_csv, unsafe_allow_html=True)
 
+    # --- Render summary table as vector figure (SVG) ---
     summary_fig = render_table_as_figure(combined_summary)
+
+    # Download as SVG
     svg_table_buffer = BytesIO()
     summary_fig.savefig(svg_table_buffer, format="svg", bbox_inches="tight")
-    b64_table_svg = base64.b64encode(svg_table_buffer.getvalue()).decode("utf-8")
+    svg_table_data = svg_table_buffer.getvalue()
+    b64_table_svg = base64.b64encode(svg_table_data).decode("utf-8")
+
     st.markdown(
         f'<a href="data:image/svg+xml;base64,{b64_table_svg}" download="summary_table.svg">📥 Download Summary Table (SVG)</a>',
         unsafe_allow_html=True
     )
 
+    # --- Download Summary Table as PNG (screenshot-like) ---
     png_table_buffer = BytesIO()
     summary_fig.savefig(png_table_buffer, format="png", bbox_inches="tight", dpi=200)
-    b64_table_png = base64.b64encode(png_table_buffer.getvalue()).decode("utf-8")
+    png_table_data = png_table_buffer.getvalue()
+    b64_table_png = base64.b64encode(png_table_data).decode("utf-8")
+
     st.markdown(
         f'<a href="data:image/png;base64,{b64_table_png}" download="summary_table.png">📸 Download Summary Table (PNG Screenshot)</a>',
         unsafe_allow_html=True
