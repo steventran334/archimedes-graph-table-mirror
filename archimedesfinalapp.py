@@ -229,17 +229,45 @@ if uploaded_files:
     xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
     ax.set_xlim(-xlim, xlim)
 
-    # Keep tick labels positive on both sides
-    ticks = ax.get_xticks()
-    ax.set_xticklabels([f"{abs(int(t))}" if t != 0 else "0" for t in ticks])
+    # ============================================================
+    # Improved X-axis tick setup for finer nanometer resolution
+    # ============================================================
+    import numpy as np
 
-    # Adjust axis and labels to avoid overlap
+    # Ensure symmetric limits (keep same max range on both sides)
+    xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
+    ax.set_xlim(-xlim, xlim)
+
+    # --- Define tick spacing ---
+    major_tick = 200   # major tick every 200 nm
+    minor_tick = 100   # minor tick every 100 nm
+
+    # Create symmetric tick positions (both sides)
+    major_ticks = np.arange(-xlim, xlim + major_tick, major_tick)
+    minor_ticks = np.arange(-xlim, xlim + minor_tick, minor_tick)
+
+    # Apply tick positions
+    ax.set_xticks(major_ticks)
+    ax.set_xticks(minor_ticks, minor=True)
+
+    # Label ticks as absolute values (no negatives)
+    ax.set_xticklabels([f"{abs(int(t))}" if t != 0 else "0" for t in major_ticks])
+
+    # Style tick marks
+    ax.tick_params(axis='x', which='major', length=6, width=1)
+    ax.tick_params(axis='x', which='minor', length=3, width=0.8)
+
+    # Optional: Add light gridlines for easier reading
+    ax.grid(which='major', axis='x', linestyle=':', color='gray', alpha=0.4)
+
+    # --- Keep the X-axis centered and labeled ---
+    ax.spines['bottom'].set_position(('data', 0))
+    ax.spines['top'].set_visible(False)
     ax.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-    ax.tick_params(axis='y', which='both', left=True, right=False)
 
-    # Position NEG/POS labels just below axis line
+    # Relabel particle regions below the x-axis
     ymin, ymax = ax.get_ylim()
-    label_y = -0.08 * ymax  # relative to upper scale, near axis
+    label_y = -0.08 * ymax
     ax.text(-xlim * 0.5, label_y, "Negatively Buoyant Particles", ha="center", va="top", fontsize=12)
     ax.text(xlim * 0.5, label_y, "Positively Buoyant Particles", ha="center", va="top", fontsize=12)
 
