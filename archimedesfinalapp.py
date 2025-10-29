@@ -186,7 +186,7 @@ if uploaded_files:
         dataset_line_widths[filename] = st.slider(f"Line width for {label}", 1, 6, 2, key=f"linewidth_{label}")
 
     plot_title = st.text_input("Enter a title for the mirrored buoyancy plot:", value="Mirrored Buoyancy Distribution")
-    # --- Mirrored Plot (in nm with labeled regions) ---
+        # --- Mirrored Plot (nm axis, symmetric, clean layout) ---
     fig, ax = plt.subplots(figsize=(8, 6))
 
     for filename, df, buoyancy_type in histogram_data:
@@ -195,8 +195,8 @@ if uploaded_files:
         y = df_clean["Average"]
 
         if buoyancy_type == "NEG":
-            # Mirror left side but keep positive magnitude labels
-            x = -x  # negative just for position, not for labeling
+            # Mirror left but keep positive labels
+            x = -x
             label_suffix = " (NEG)"
         elif buoyancy_type == "POS":
             label_suffix = " (POS)"
@@ -215,21 +215,24 @@ if uploaded_files:
 
     # --- Formatting ---
     ax.axvline(0, color="black", linestyle="--", linewidth=1)
-    ax.set_xlabel("Diameter (nm)", fontsize=12)
+    ax.set_xlabel("Diameter [nm]", fontsize=12)
     ax.set_ylabel("Concentration [#/mL]", fontsize=12)
     ax.set_title(plot_title, fontsize=14, weight="bold")
 
-    # Make axes symmetric
+    # Make both sides symmetric
     xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
     ax.set_xlim(-xlim, xlim)
 
-    # Make tick labels positive on both sides
+    # Use positive tick labels on both sides
     ticks = ax.get_xticks()
-    ax.set_xticklabels([str(abs(int(t))) if t != 0 else "0" for t in ticks])
+    ax.set_xticklabels([f"{abs(int(t))}" if t != 0 else "0" for t in ticks])
 
-    # Position NEG/POS labels below plot
+    # Extend vertical line slightly below to visually separate bottom text
     ymin, ymax = ax.get_ylim()
-    label_y = ymin - (ymax - ymin) * 0.08
+    ax.vlines(0, ymin - (ymax - ymin) * 0.1, ymax, color="black", linestyle="--", linewidth=1)
+
+    # --- Position NEG/POS labels dynamically ---
+    label_y = ymin - (ymax - ymin) * 0.12
     ax.text(-xlim * 0.5, label_y, "Negatively Buoyant Particles", ha="center", va="top", fontsize=12)
     ax.text(xlim * 0.5, label_y, "Positively Buoyant Particles", ha="center", va="top", fontsize=12)
 
@@ -237,6 +240,10 @@ if uploaded_files:
     legend = ax.legend(title="Datasets", loc="upper right", frameon=True)
     legend.get_frame().set_edgecolor("black")
     legend.get_frame().set_linewidth(0.8)
+
+    # Axis label cleanup
+    ax.spines['top'].set_visible(True)
+    ax.spines['right'].set_visible(True)
 
     plt.tight_layout()
     st.pyplot(fig)
