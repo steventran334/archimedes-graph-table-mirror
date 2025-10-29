@@ -186,38 +186,69 @@ if uploaded_files:
         dataset_line_widths[filename] = st.slider(f"Line width for {label}", 1, 6, 2, key=f"linewidth_{label}")
 
     plot_title = st.text_input("Enter a title for the mirrored buoyancy plot:", value="Mirrored Buoyancy Distribution")
+# --- Mirrored Plot (in nm with labeled regions) ---
+fig, ax = plt.subplots(figsize=(8, 6))
 
-    # --- Mirrored Plot ---
-    fig, ax = plt.subplots()
-    for filename, df, buoyancy_type in histogram_data:
-        df_clean = df.dropna(subset=["Bin Center", "Average"])
-        x = df_clean["Bin Center"]
-        y = df_clean["Average"]
+for filename, df, buoyancy_type in histogram_data:
+    df_clean = df.dropna(subset=["Bin Center", "Average"])
+    x = df_clean["Bin Center"] * 1000  # Convert µm → nm
+    y = df_clean["Average"]
 
-        if buoyancy_type == "NEG":
-            x = -x  # Mirror left
-            label_suffix = " (NEG)"
-        elif buoyancy_type == "POS":
-            label_suffix = " (POS)"
-        else:
-            label_suffix = ""
+    if buoyancy_type == "NEG":
+        # Mirror by reversing order but keeping positive magnitudes
+        x = -x[::-1]
+        label_suffix = " (NEG)"
+    elif buoyancy_type == "POS":
+        label_suffix = " (POS)"
+    else:
+        label_suffix = ""
 
-        ax.plot(
-            x, y,
-            label=f"{dataset_labels[filename]}{label_suffix}",
-            color=dataset_colors[filename],
-            linestyle=dataset_line_styles[filename],
-            linewidth=dataset_line_widths[filename],
-            marker=dataset_markers[filename],
-            markersize=dataset_marker_sizes[filename]
-        )
+    ax.plot(
+        x, y,
+        label=f"{dataset_labels[filename]}{label_suffix}",
+        color=dataset_colors[filename],
+        linestyle=dataset_line_styles[filename],
+        linewidth=dataset_line_widths[filename],
+        marker=dataset_markers[filename],
+        markersize=dataset_marker_sizes[filename]
+    )
 
-    ax.axvline(0, color="black", linestyle="--", linewidth=1)
-    ax.set_xlabel("Diameter [μm] (Negative = Negatively Buoyant, Positive = Positively Buoyant)")
-    ax.set_ylabel("Concentration [#/mL]")
-    ax.set_title(plot_title)
-    ax.legend(title="Datasets")
-    st.pyplot(fig)
+# --- Axis and aesthetic formatting ---
+ax.axvline(0, color="black", linestyle="--", linewidth=1)
+ax.set_xlabel("Diameter (nm)", fontsize=12)
+ax.set_ylabel("Concentration [#/mL]", fontsize=12)
+ax.set_title("Mirrored Buoyancy Distribution", fontsize=14, weight="bold")
+
+# Adjust x-ticks to be symmetric and visually balanced
+xlims = ax.get_xlim()
+ax.set_xlim(-abs(xlims[1]), abs(xlims[1]))
+
+# Remove negative signs from tick labels on left side
+ticks = ax.get_xticks()
+ax.set_xticklabels([abs(int(t)) if t != 0 else "0" for t in ticks])
+
+# Add text labels below plot for NEG and POS sides
+ymin, ymax = ax.get_ylim()
+y_text = ymin - (ymax - ymin) * 0.08  # relative positioning
+
+ax.text(
+    xlims[0] * 0.5, y_text,
+    "Negatively Buoyant Particles",
+    ha="center", va="top", fontsize=12
+)
+ax.text(
+    xlims[1] * 0.5, y_text,
+    "Positively Buoyant Particles",
+    ha="center", va="top", fontsize=12
+)
+
+# Legend
+legend = ax.legend(title="Datasets", loc="upper right", frameon=True)
+legend.get_frame().set_edgecolor("black")
+legend.get_frame().set_linewidth(0.8)
+
+plt.tight_layout()
+st.pyplot(fig)
 
     # --- Summary Table ---
     combined_summary = pd.DataFrame(all_summaries)
