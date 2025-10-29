@@ -7,10 +7,12 @@ import io
 import unicodedata
 from matplotlib import pyplot as plt
 from matplotlib.table import Table
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 
 st.set_page_config(layout="wide")
 
-st.title("Archimedes to CSV")
+st.title("Archimedes to CSV + Mirrored Buoyancy Plot")
 
 st.markdown("""
     <style>
@@ -99,9 +101,8 @@ if uploaded_files:
         df_dist = df_dist[~df_dist['Bin Center'].astype(str).str.contains('<|>')]
         df_dist['Bin Center'] = pd.to_numeric(df_dist['Bin Center'], errors='coerce')
         df_dist['Average'] = pd.to_numeric(df_dist['Average'], errors='coerce')
-        histogram_data.append((filename, df_dist))
 
-        # Summary Table with µm-to-nm conversion
+        # Summary Table
         def convert_um_to_nm(value):
             try:
                 return str(int(round(float(value) * 1000)))
@@ -133,35 +134,35 @@ if uploaded_files:
             "Limit of Detection [μm]": extract_value(content, "Limit of Detection [μm]", 1, 2)
         }
 
+        # Determine buoyancy from metadata (Positive or Negative)
+        buoyancy = summary_table["Buoyancy"].strip().lower()
+        if "neg" in buoyancy:
+            buoyancy_type = "NEG"
+        elif "pos" in buoyancy:
+            buoyancy_type = "POS"
+        else:
+            buoyancy_type = "UNKNOWN"
+
+        summary_table["Buoyancy Type"] = buoyancy_type
         all_summaries[dataset_labels[filename]] = summary_table
 
-    # Let user choose any color for each dataset, with custom cycling defaults
-    st.subheader("Choose Colors for Each Dataset")
+        # Store data
+        histogram_data.append((filename, df_dist, buoyancy_type))
 
-    # List of generic color names and their hex codes
+    # --- Color selection ---
+    st.subheader("Choose Colors for Each Dataset")
     generic_colors = {
-        "Black": "#000000",
-        "Blue": "#1f77b4",
-        "Red": "#d62728",
-        "Green": "#2ca02c",
-        "Orange": "#ff7f0e",
-        "Purple": "#9467bd",
-        "Brown": "#8c564b",
-        "Pink": "#e377c2",
-        "Olive": "#bcbd22",
-        "Cyan": "#17becf",
-        "Gray": "#7f7f7f",
-        "Light Gray": "#BFBFBF",
-        "Dark Gray": "#4D4D4D"
+        "Black": "#000000", "Blue": "#1f77b4", "Red": "#d62728",
+        "Green": "#2ca02c", "Orange": "#ff7f0e", "Purple": "#9467bd",
+        "Brown": "#8c564b", "Pink": "#e377c2", "Olive": "#bcbd22",
+        "Cyan": "#17becf", "Gray": "#7f7f7f"
     }
     generic_color_names = list(generic_colors.keys())
-    default_cycle = ["Black", "Red", "Green", "Blue", "Purple", "Orange", "Cyan"]
+    default_cycle = ["Black", "Red", "Blue", "Green"]
 
     dataset_colors = {}
-
-    for i, (filename, _) in enumerate(histogram_data):
+    for i, (filename, _, _) in enumerate(histogram_data):
         label = dataset_labels[filename]
-        # Cycle through Black, Blue, Red, Green as defaults
         default_color_name = default_cycle[i % len(default_cycle)]
         selected_color_name = st.selectbox(
             f"Color for {label}",
@@ -171,192 +172,72 @@ if uploaded_files:
         )
         dataset_colors[filename] = generic_colors[selected_color_name]
 
+    # --- Marker and line style options ---
+    st.subheader("Choose Marker Shape and Line Style")
+    marker_options = {"None": None, "Circle": 'o', "Triangle": '^', "Square": 's', "Diamond": 'D', "Star": '*', "X": 'x', "Plus": '+'}
+    line_style_options = {"Solid": "-", "Dashed": "--", "Dotted": ":", "Dash-dot": "-."}
+    dataset_markers, dataset_marker_sizes, dataset_line_styles, dataset_line_widths = {}, {}, {}, {}
 
-    # Let user choose marker shape
-    st.subheader("Choose Marker Shape for Each Dataset")
-    marker_options = {
-        "None": None,
-        "Circle": 'o',
-        "Triangle": '^',
-        "Square": 's',
-        "Diamond": 'D',
-        "Star": '*',
-        "X": 'x',
-        "Plus": '+'
-    }
-    dataset_markers = {}
-    dataset_marker_sizes = {}
-
-    for i, (filename, _) in enumerate(histogram_data):
+    for filename, _, _ in histogram_data:
         label = dataset_labels[filename]
-        default_shape_index = 0 if len(uploaded_files) > 1 else (i % len(marker_options))
-        selected_shape = st.selectbox(f"Marker for {label}", list(marker_options.keys()), index=default_shape_index)
-        dataset_markers[filename] = marker_options[selected_shape]
+        dataset_markers[filename] = marker_options[st.selectbox(f"Marker for {label}", list(marker_options.keys()), index=0, key=f"marker_{label}")]
+        dataset_marker_sizes[filename] = st.slider(f"Marker size for {label}", 4, 20, 8, key=f"marker_size_{label}")
+        dataset_line_styles[filename] = line_style_options[st.selectbox(f"Line style for {label}", list(line_style_options.keys()), index=0, key=f"linestyle_{label}")]
+        dataset_line_widths[filename] = st.slider(f"Line width for {label}", 1, 6, 2, key=f"linewidth_{label}")
 
-        selected_size = st.slider(f"Marker size for {label}", min_value=4, max_value=20, value=8)
-        dataset_marker_sizes[filename] = selected_size
+    plot_title = st.text_input("Enter a title for the mirrored buoyancy plot:", value="Mirrored Buoyancy Distribution")
 
-    st.subheader("Set Plot Title")
-    plot_title = st.text_input("Enter a title for the histogram:", value=" ")
-
-    # --- Overlapping histograms with shape overlays ---
-    st.subheader(" ")
-
-    def extract_bin_size(lines):
-        for line in lines:
-            if "Bin Size" in line:
-                parts = line.split(',')
-                for p in parts:
-                    try:
-                        return float(p)
-                    except:
-                        continue
-        return 0.01
-
-    bin_size = extract_bin_size(content)
-    bar_width = bin_size * 0.95
-
+    # --- Mirrored Plot ---
     fig, ax = plt.subplots()
+    for filename, df, buoyancy_type in histogram_data:
+        df_clean = df.dropna(subset=["Bin Center", "Average"])
+        x = df_clean["Bin Center"]
+        y = df_clean["Average"]
 
-    for i, (filename, df) in enumerate(histogram_data):
-        df_clean = df[~df['Bin Center'].astype(str).str.contains('<|>')]
-        df_clean = df_clean[['Bin Center', 'Average']].dropna()
-        df_clean['Bin Center'] = pd.to_numeric(df_clean['Bin Center'], errors='coerce')
-        df_clean['Average'] = pd.to_numeric(df_clean['Average'], errors='coerce')
+        if buoyancy_type == "NEG":
+            x = -x  # Mirror left
+            label_suffix = " (NEG)"
+        elif buoyancy_type == "POS":
+            label_suffix = " (POS)"
+        else:
+            label_suffix = ""
 
-        # Plot bars
-        ax.bar(
-            df_clean['Bin Center'],
-            df_clean['Average'],
-                    width=bar_width,
-            label=dataset_labels[filename],
-            alpha=0.5,
-            align='center',
-            color=dataset_colors[filename]
+        ax.plot(
+            x, y,
+            label=f"{dataset_labels[filename]}{label_suffix}",
+            color=dataset_colors[filename],
+            linestyle=dataset_line_styles[filename],
+            linewidth=dataset_line_widths[filename],
+            marker=dataset_markers[filename],
+            markersize=dataset_marker_sizes[filename]
         )
-        # Overlay markers if selected
-        marker_shape = dataset_markers[filename]
-        if marker_shape:
-            ax.plot(
-                df_clean['Bin Center'],
-                df_clean['Average'],
-                linestyle='',
-                marker=marker_shape,
-                markersize=dataset_marker_sizes[filename],
-                color=dataset_colors[filename],
-                label="_nolegend_"
-            )
 
-    ax.set_xlabel("Diameter [μm]")
+    ax.axvline(0, color="black", linestyle="--", linewidth=1)
+    ax.set_xlabel("Diameter [μm] (Negative = Negatively Buoyant, Positive = Positively Buoyant)")
     ax.set_ylabel("Concentration [#/mL]")
     ax.set_title(plot_title)
-
-    from matplotlib.lines import Line2D
-    custom_handles = []
-    for filename in dataset_labels:
-        label = dataset_labels[filename]
-        marker = dataset_markers[filename]
-        color = dataset_colors[filename]
-        size = dataset_marker_sizes[filename]
-        if marker:
-            handle = Line2D(
-                [0], [0],
-                marker=marker,
-                color='w',
-                markerfacecolor=color,
-                markeredgecolor=color,
-                markersize=size,
-                label=label,
-                linestyle='None'
-            )
-        else:
-            from matplotlib.patches import Patch
-            handle = Patch(facecolor=color, edgecolor='black', label=label)
-        custom_handles.append(handle)
-
-    ax.legend(handles=custom_handles, title="Datasets")
+    ax.legend(title="Datasets")
     st.pyplot(fig)
 
-    # --- Download Histogram as SVG ---
+    # --- Summary Table ---
+    combined_summary = pd.DataFrame(all_summaries)
+    st.subheader("Summary Table Comparison")
+    st.dataframe(combined_summary, use_container_width=True)
+    # --- Download Mirrored Plot as SVG ---
     svg_buffer = BytesIO()
     fig.savefig(svg_buffer, format="svg", bbox_inches="tight")
     svg_data = svg_buffer.getvalue()
     b64_svg = base64.b64encode(svg_data).decode("utf-8")
-    href_svg = f'<a href="data:image/svg+xml;base64,{b64_svg}" download="histogram.svg">📥 Download Histogram (SVG)</a>'
+    href_svg = f'<a href="data:image/svg+xml;base64,{b64_svg}" download="mirrored_buoyancy_plot.svg">📥 Download Mirrored Plot (SVG)</a>'
     st.markdown(href_svg, unsafe_allow_html=True)
 
-    # --- Line Graph of Particle Size Distributions ---
-    st.subheader("Line Graph of Particle Size Distributions")
-    
-    # Use the same title as the histogram
-    line_plot_title = plot_title
-
-
-    # Let user choose line style and width for each dataset
-    line_style_options = {
-        "Solid": "-",
-        "Dashed": "--",
-        "Dotted": ":",
-        "Dash-dot": "-."
-    }
-    dataset_line_styles = {}
-    dataset_line_widths = {}
-
-    for i, (filename, _) in enumerate(histogram_data):
-        label = dataset_labels[filename]
-        default_style = "Solid"
-        selected_style = st.selectbox(
-            f"Line style for {label}",
-            list(line_style_options.keys()),
-            index=list(line_style_options.keys()).index(default_style),
-            key=f"line_style_{label}"
-        )
-        dataset_line_styles[filename] = line_style_options[selected_style]
-
-        selected_width = st.slider(
-            f"Line width for {label}",
-            min_value=1, max_value=6, value=2,
-            key=f"line_width_{label}"
-        )
-        dataset_line_widths[filename] = selected_width
-
-    line_fig, line_ax = plt.subplots()
-
-    for filename, df in histogram_data:
-        df_clean = df[~df['Bin Center'].astype(str).str.contains('<|>')]
-        df_clean = df_clean[['Bin Center', 'Average']].dropna()
-        df_clean['Bin Center'] = pd.to_numeric(df_clean['Bin Center'], errors='coerce')
-        df_clean['Average'] = pd.to_numeric(df_clean['Average'], errors='coerce')
-
-        line_ax.plot(
-            df_clean['Bin Center'],
-            df_clean['Average'],
-            label=dataset_labels[filename],
-            color=dataset_colors[filename],
-            linestyle=dataset_line_styles[filename],
-            linewidth=dataset_line_widths[filename],
-            marker=dataset_markers[filename] if dataset_markers[filename] else None,
-            markersize=dataset_marker_sizes[filename] if dataset_markers[filename] else None
-        )
-
-    line_ax.set_xlabel("Diameter [μm]")
-    line_ax.set_ylabel("Concentration [#/mL]")
-    line_ax.set_title(line_plot_title)
-    line_ax.legend(title="Datasets")
-    st.pyplot(line_fig)
-
-    # --- Download Line Graph as SVG ---
-    svg_line_buffer = BytesIO()
-    line_fig.savefig(svg_line_buffer, format="svg", bbox_inches="tight")
-    svg_line_data = svg_line_buffer.getvalue()
-    b64_line_svg = base64.b64encode(svg_line_data).decode("utf-8")
-    href_line_svg = f'<a href="data:image/svg+xml;base64,{b64_line_svg}" download="line_graph.svg">📥 Download Line Graph (SVG)</a>'
-    st.markdown(href_line_svg, unsafe_allow_html=True)
-
-    # --- Combine Summary Tables Side-by-Side ---
-    combined_summary = pd.DataFrame(all_summaries)
-    st.subheader("Summary Table Comparison")
-    st.dataframe(combined_summary, use_container_width=True)
+    # --- Download Mirrored Plot as PNG ---
+    png_buffer = BytesIO()
+    fig.savefig(png_buffer, format="png", bbox_inches="tight", dpi=300)
+    png_data = png_buffer.getvalue()
+    b64_png = base64.b64encode(png_data).decode("utf-8")
+    href_png = f'<a href="data:image/png;base64,{b64_png}" download="mirrored_buoyancy_plot.png">📸 Download Mirrored Plot (PNG)</a>'
+    st.markdown(href_png, unsafe_allow_html=True)
 
     # --- Download Summary Table as CSV ---
     csv_buffer = StringIO()
@@ -365,10 +246,8 @@ if uploaded_files:
     href_csv = f'<a href="data:file/csv;base64,{b64_csv}" download="summary_table.csv">📥 Download Summary Table (CSV)</a>'
     st.markdown(href_csv, unsafe_allow_html=True)
 
-    # --- Render summary table as vector figure (SVG) ---
+    # --- Render Summary Table as Figure (SVG + PNG) ---
     summary_fig = render_table_as_figure(combined_summary)
-
-    # Download as SVG
     svg_table_buffer = BytesIO()
     summary_fig.savefig(svg_table_buffer, format="svg", bbox_inches="tight")
     svg_table_data = svg_table_buffer.getvalue()
@@ -379,13 +258,13 @@ if uploaded_files:
         unsafe_allow_html=True
     )
 
-    # --- Download Summary Table as PNG (screenshot-like) ---
+    # --- Download Summary Table as PNG ---
     png_table_buffer = BytesIO()
     summary_fig.savefig(png_table_buffer, format="png", bbox_inches="tight", dpi=200)
     png_table_data = png_table_buffer.getvalue()
     b64_table_png = base64.b64encode(png_table_data).decode("utf-8")
 
     st.markdown(
-        f'<a href="data:image/png;base64,{b64_table_png}" download="summary_table.png">📸 Download Summary Table (PNG Screenshot)</a>',
+        f'<a href="data:image/png;base64,{b64_table_png}" download="summary_table.png">📸 Download Summary Table (PNG)</a>',
         unsafe_allow_html=True
     )
