@@ -213,26 +213,33 @@ if uploaded_files:
             markersize=dataset_marker_sizes[filename]
         )
 
-    # --- Formatting ---
+        # --- Axis and aesthetic formatting ---
     ax.axvline(0, color="black", linestyle="--", linewidth=1)
-    ax.set_xlabel("Diameter [nm]", fontsize=12)
+    ax.set_xlabel("Diameter [nm]", fontsize=12, labelpad=30)
     ax.set_ylabel("Concentration [#/mL]", fontsize=12)
     ax.set_title(plot_title, fontsize=14, weight="bold")
 
-    # Make both sides symmetric
+    # Move x-axis spine to y=0 (directly under data)
+    ax.spines['bottom'].set_position(('data', 0))
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(True)
+
+    # Keep symmetric scale
     xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
     ax.set_xlim(-xlim, xlim)
 
-    # Use positive tick labels on both sides
+    # Keep tick labels positive on both sides
     ticks = ax.get_xticks()
     ax.set_xticklabels([f"{abs(int(t))}" if t != 0 else "0" for t in ticks])
 
-    # Extend vertical line slightly below to visually separate bottom text
-    ymin, ymax = ax.get_ylim()
-    ax.vlines(0, ymin - (ymax - ymin) * 0.1, ymax, color="black", linestyle="--", linewidth=1)
+    # Adjust axis and labels to avoid overlap
+    ax.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+    ax.tick_params(axis='y', which='both', left=True, right=False)
 
-    # --- Position NEG/POS labels dynamically ---
-    label_y = ymin - (ymax - ymin) * 0.12
+    # Position NEG/POS labels just below axis line
+    ymin, ymax = ax.get_ylim()
+    label_y = -0.08 * ymax  # relative to upper scale, near axis
     ax.text(-xlim * 0.5, label_y, "Negatively Buoyant Particles", ha="center", va="top", fontsize=12)
     ax.text(xlim * 0.5, label_y, "Positively Buoyant Particles", ha="center", va="top", fontsize=12)
 
@@ -240,10 +247,6 @@ if uploaded_files:
     legend = ax.legend(title="Datasets", loc="upper right", frameon=True)
     legend.get_frame().set_edgecolor("black")
     legend.get_frame().set_linewidth(0.8)
-
-    # Axis label cleanup
-    ax.spines['top'].set_visible(True)
-    ax.spines['right'].set_visible(True)
 
     plt.tight_layout()
     st.pyplot(fig)
