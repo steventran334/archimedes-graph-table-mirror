@@ -229,60 +229,76 @@ if uploaded_files:
     xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
     ax.set_xlim(-xlim, xlim)
 
-        # ============================================================
-    # Adjustable X-axis range (with clean, evenly spaced ticks)
+    # ============================================================
+    # Independent adjustable X-axis ranges (NEG and POS sides)
     # ============================================================
     import numpy as np
 
-    # Determine automatic limit from data
+    # Determine automatic limits from data
     auto_xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
     auto_xlim_rounded = int(np.ceil(auto_xlim / 100.0) * 100)
 
-    # --- Let user override maximum x-axis range ---
-    st.subheader("Adjust X-Axis Range")
-    max_nm = st.number_input(
-        "Set maximum diameter range (nm, symmetric ±):",
-        min_value=200,
-        max_value=5000,
-        value=auto_xlim_rounded,
-        step=100,
-        help="Adjusts the visible diameter range for both positive and negative sides (e.g. enter 1200 for ±1200 nm)."
-    )
+    # --- Let user control each side independently ---
+    st.subheader("Adjust X-Axis Range (Independent for Each Side)")
+    col1, col2 = st.columns(2)
 
-    # Apply the chosen range
-    ax.set_xlim(-max_nm, max_nm)
+    with col1:
+        max_neg_nm = st.number_input(
+            "Max diameter for negatively buoyant side [nm]",
+            min_value=100,
+            max_value=5000,
+            value=auto_xlim_rounded,
+            step=100,
+            help="Adjusts left-side range (negatively buoyant particles)."
+        )
 
-    # --- Define tick spacing (major every 200 nm, minor every 100 nm) ---
+    with col2:
+        max_pos_nm = st.number_input(
+            "Max diameter for positively buoyant side [nm]",
+            min_value=100,
+            max_value=5000,
+            value=auto_xlim_rounded,
+            step=100,
+            help="Adjusts right-side range (positively buoyant particles)."
+        )
+
+    # Apply the chosen ranges
+    ax.set_xlim(-max_neg_nm, max_pos_nm)
+
+    # --- Define consistent tick spacing ---
     major_tick = 200
     minor_tick = 100
-    major_ticks = np.arange(-max_nm, max_nm + major_tick, major_tick)
-    minor_ticks = np.arange(-max_nm, max_nm + minor_tick, minor_tick)
+
+    # Create mirrored tick arrays that fit both sides nicely
+    major_ticks = np.arange(-max_neg_nm, max_pos_nm + major_tick, major_tick)
+    minor_ticks = np.arange(-max_neg_nm, max_pos_nm + minor_tick, minor_tick)
 
     # Apply tick positions
     ax.set_xticks(major_ticks)
     ax.set_xticks(minor_ticks, minor=True)
 
-    # Label ticks as absolute values (no negatives)
+    # Label ticks as absolute values (remove negatives)
     ax.set_xticklabels([f"{abs(int(t))}" if t != 0 else "0" for t in major_ticks])
 
     # Tick styling
     ax.tick_params(axis='x', which='major', length=6, width=1)
     ax.tick_params(axis='x', which='minor', length=3, width=0.8)
 
-    # Optional: subtle gridlines for easier size reading
+    # Optional: light gridlines
     ax.grid(which='major', axis='x', linestyle=':', color='gray', alpha=0.4)
 
-    # Keep x-axis centered at y = 0
+    # Keep x-axis centered at y=0 (directly under distributions)
     ax.spines['bottom'].set_position(('data', 0))
     ax.spines['top'].set_visible(False)
     ax.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
 
-    # --- Update NEG/POS labels below the axis ---
+    # --- Update region labels below the x-axis ---
     ymin, ymax = ax.get_ylim()
     label_y = -0.08 * ymax
-    ax.text(-max_nm * 0.5, label_y, "Negatively Buoyant Particles",
+
+    ax.text(-max_neg_nm * 0.5, label_y, "Negatively Buoyant Particles",
             ha="center", va="top", fontsize=12)
-    ax.text(max_nm * 0.5, label_y, "Positively Buoyant Particles",
+    ax.text(max_pos_nm * 0.5, label_y, "Positively Buoyant Particles",
             ha="center", va="top", fontsize=12)
     # Legend styling
     legend = ax.legend(title="Datasets", loc="upper right", frameon=True)
