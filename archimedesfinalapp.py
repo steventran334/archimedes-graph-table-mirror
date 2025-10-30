@@ -229,23 +229,34 @@ if uploaded_files:
     xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
     ax.set_xlim(-xlim, xlim)
 
-       # ============================================================
-    # Clean, evenly spaced x-axis ticks (nice round numbers)
+        # ============================================================
+    # Adjustable X-axis range (with clean, evenly spaced ticks)
     # ============================================================
     import numpy as np
 
-    # Ensure symmetric limits around 0
-    xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
+    # Determine automatic limit from data
+    auto_xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
+    auto_xlim_rounded = int(np.ceil(auto_xlim / 100.0) * 100)
 
-    # Round to nearest 100 nm for clean labeling
-    xlim_rounded = int(np.ceil(xlim / 100.0) * 100)
-    ax.set_xlim(-xlim_rounded, xlim_rounded)
+    # --- Let user override maximum x-axis range ---
+    st.subheader("Adjust X-Axis Range")
+    max_nm = st.number_input(
+        "Set maximum diameter range (nm, symmetric ±):",
+        min_value=200,
+        max_value=5000,
+        value=auto_xlim_rounded,
+        step=100,
+        help="Adjusts the visible diameter range for both positive and negative sides (e.g. enter 1200 for ±1200 nm)."
+    )
 
-    # Define major ticks every 200 nm, minor ticks every 100 nm
+    # Apply the chosen range
+    ax.set_xlim(-max_nm, max_nm)
+
+    # --- Define tick spacing (major every 200 nm, minor every 100 nm) ---
     major_tick = 200
     minor_tick = 100
-    major_ticks = np.arange(-xlim_rounded, xlim_rounded + major_tick, major_tick)
-    minor_ticks = np.arange(-xlim_rounded, xlim_rounded + minor_tick, minor_tick)
+    major_ticks = np.arange(-max_nm, max_nm + major_tick, major_tick)
+    minor_ticks = np.arange(-max_nm, max_nm + minor_tick, minor_tick)
 
     # Apply tick positions
     ax.set_xticks(major_ticks)
@@ -258,7 +269,7 @@ if uploaded_files:
     ax.tick_params(axis='x', which='major', length=6, width=1)
     ax.tick_params(axis='x', which='minor', length=3, width=0.8)
 
-    # Optional: subtle dotted gridlines for reference
+    # Optional: subtle gridlines for easier size reading
     ax.grid(which='major', axis='x', linestyle=':', color='gray', alpha=0.4)
 
     # Keep x-axis centered at y = 0
@@ -266,12 +277,12 @@ if uploaded_files:
     ax.spines['top'].set_visible(False)
     ax.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
 
-    # --- Update NEG/POS region labels ---
+    # --- Update NEG/POS labels below the axis ---
     ymin, ymax = ax.get_ylim()
     label_y = -0.08 * ymax
-    ax.text(-xlim_rounded * 0.5, label_y, "Negatively Buoyant Particles",
+    ax.text(-max_nm * 0.5, label_y, "Negatively Buoyant Particles",
             ha="center", va="top", fontsize=12)
-    ax.text(xlim_rounded * 0.5, label_y, "Positively Buoyant Particles",
+    ax.text(max_nm * 0.5, label_y, "Positively Buoyant Particles",
             ha="center", va="top", fontsize=12)
     # Legend styling
     legend = ax.legend(title="Datasets", loc="upper right", frameon=True)
