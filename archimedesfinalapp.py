@@ -185,7 +185,7 @@ if uploaded_files:
         dataset_line_styles[filename] = line_style_options[st.selectbox(f"Line style for {label}", list(line_style_options.keys()), index=0, key=f"linestyle_{label}")]
         dataset_line_widths[filename] = st.slider(f"Line width for {label}", 1, 6, 2, key=f"linewidth_{label}")
 
-    plot_title = st.text_input("Enter a title for the mirrored buoyancy plot:", value="Mirrored Buoyancy Distribution")
+    plot_title = st.text_input("Enter a title for the mirrored buoyancy plot:", value="")
         # --- Mirrored Plot (nm axis, symmetric, clean layout) ---
     fig, ax = plt.subplots(figsize=(8, 6))
 
