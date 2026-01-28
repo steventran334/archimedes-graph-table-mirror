@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from matplotlib.table import Table
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-import re  # Added for Regex string manipulation
+import re  # Regex for grouping filenames
 
 st.set_page_config(layout="wide")
 
@@ -167,11 +167,9 @@ if uploaded_files:
     # 1. Identify Unique Base Groups to assign cycle colors
     base_groups = []
     
-    # We loop once to find all unique "base names" (e.g. "SOP" from "SOP POS" and "SOP NEG")
     for filename, _, _ in histogram_data:
         label = dataset_labels[filename]
-        # Regex to remove POS/NEG/pos/neg and surrounding spaces/underscores/dashes
-        # e.g., "SOP POS" -> "SOP", "fast_neg" -> "fast"
+        # Regex to remove POS/NEG and spaces/underscores/dashes to find base name
         base_name = re.sub(r'[\s_-]*\b(POS|NEG|pos|neg)\b[\s_-]*', '', label, flags=re.IGNORECASE).strip()
         
         if base_name not in base_groups:
@@ -187,14 +185,14 @@ if uploaded_files:
         # Find which group this file belongs to
         group_index = base_groups.index(base_name)
         
-        # Pick color from cycle based on group index, not file index
+        # Pick color from cycle based on group index
         default_color_name = default_cycle[group_index % len(default_cycle)]
         
         selected_color_name = st.selectbox(
             f"Color for {label}",
             generic_color_names,
             index=generic_color_names.index(default_color_name),
-            key=f"color_{filename}" # Using filename as key to avoid duplicates if labels are same
+            key=f"color_{filename}"
         )
         dataset_colors[filename] = generic_colors[selected_color_name]
 
@@ -221,18 +219,13 @@ if uploaded_files:
         x = df_clean["Bin Center"] * 1000  # µm → nm
         y = df_clean["Average"]
 
+        # Only affect the X-axis coordinate, do NOT append string to label
         if buoyancy_type == "NEG":
-            # Mirror left but keep positive labels
             x = -x
-            label_suffix = " (NEG)"
-        elif buoyancy_type == "POS":
-            label_suffix = " (POS)"
-        else:
-            label_suffix = ""
 
         ax.plot(
             x, y,
-            label=f"{dataset_labels[filename]}{label_suffix}",
+            label=dataset_labels[filename], # No suffix added
             color=dataset_colors[filename],
             linestyle=dataset_line_styles[filename],
             linewidth=dataset_line_widths[filename],
@@ -252,7 +245,7 @@ if uploaded_files:
     ax.spines['right'].set_visible(False)
     ax.spines['left'].set_visible(True)
 
-    # Keep symmetric scale
+    # Keep symmetric scale (initially)
     xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
     ax.set_xlim(-xlim, xlim)
 
@@ -261,7 +254,6 @@ if uploaded_files:
     # ============================================================
     import numpy as np
 
-    # Determine automatic limits from data
     if np.isnan(xlim):
         xlim = 1000 
         
@@ -331,6 +323,7 @@ if uploaded_files:
             ha="center", va="top", fontsize=12)
     ax.text(max_pos_nm * 0.5, label_y, "Positively Buoyant Particles",
             ha="center", va="top", fontsize=12)
+    
     # Legend styling
     legend = ax.legend(title="Datasets", loc="upper right", frameon=True)
     legend.get_frame().set_edgecolor("black")
