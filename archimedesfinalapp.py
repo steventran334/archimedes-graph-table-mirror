@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 from matplotlib.table import Table
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+import re  # Added for Regex string manipulation
 
 st.set_page_config(layout="wide")
 
@@ -151,24 +152,49 @@ if uploaded_files:
 
     # --- Color selection ---
     st.subheader("Choose Colors for Each Dataset")
+    
     generic_colors = {
-        "Black": "#000000", "Blue": "#1f77b4", "Red": "#d62728",
-        "Green": "#2ca02c", "Orange": "#ff7f0e", "Purple": "#9467bd",
-        "Brown": "#8c564b", "Pink": "#e377c2", "Olive": "#bcbd22",
-        "Cyan": "#17becf", "Gray": "#7f7f7f"
+        "Red": "#d62728", "Blue": "#1f77b4", "Green": "#2ca02c", 
+        "Purple": "#9467bd", "Black": "#000000", 
+        "Orange": "#ff7f0e", "Brown": "#8c564b", "Pink": "#e377c2", 
+        "Olive": "#bcbd22", "Cyan": "#17becf", "Gray": "#7f7f7f"
     }
     generic_color_names = list(generic_colors.keys())
-    default_cycle = ["Black", "Red", "Blue", "Green"]
+    
+    # Specified default cycle order
+    default_cycle = ["Red", "Blue", "Green", "Purple", "Black"]
+
+    # 1. Identify Unique Base Groups to assign cycle colors
+    base_groups = []
+    
+    # We loop once to find all unique "base names" (e.g. "SOP" from "SOP POS" and "SOP NEG")
+    for filename, _, _ in histogram_data:
+        label = dataset_labels[filename]
+        # Regex to remove POS/NEG/pos/neg and surrounding spaces/underscores/dashes
+        # e.g., "SOP POS" -> "SOP", "fast_neg" -> "fast"
+        base_name = re.sub(r'[\s_-]*\b(POS|NEG|pos|neg)\b[\s_-]*', '', label, flags=re.IGNORECASE).strip()
+        
+        if base_name not in base_groups:
+            base_groups.append(base_name)
 
     dataset_colors = {}
+    
+    # 2. Assign colors based on the base group index
     for i, (filename, _, _) in enumerate(histogram_data):
         label = dataset_labels[filename]
-        default_color_name = default_cycle[i % len(default_cycle)]
+        base_name = re.sub(r'[\s_-]*\b(POS|NEG|pos|neg)\b[\s_-]*', '', label, flags=re.IGNORECASE).strip()
+        
+        # Find which group this file belongs to
+        group_index = base_groups.index(base_name)
+        
+        # Pick color from cycle based on group index, not file index
+        default_color_name = default_cycle[group_index % len(default_cycle)]
+        
         selected_color_name = st.selectbox(
             f"Color for {label}",
             generic_color_names,
             index=generic_color_names.index(default_color_name),
-            key=f"color_{label}"
+            key=f"color_{filename}" # Using filename as key to avoid duplicates if labels are same
         )
         dataset_colors[filename] = generic_colors[selected_color_name]
 
@@ -180,13 +206,14 @@ if uploaded_files:
 
     for filename, _, _ in histogram_data:
         label = dataset_labels[filename]
-        dataset_markers[filename] = marker_options[st.selectbox(f"Marker for {label}", list(marker_options.keys()), index=0, key=f"marker_{label}")]
-        dataset_marker_sizes[filename] = st.slider(f"Marker size for {label}", 4, 20, 8, key=f"marker_size_{label}")
-        dataset_line_styles[filename] = line_style_options[st.selectbox(f"Line style for {label}", list(line_style_options.keys()), index=0, key=f"linestyle_{label}")]
-        dataset_line_widths[filename] = st.slider(f"Line width for {label}", 1, 6, 2, key=f"linewidth_{label}")
+        dataset_markers[filename] = marker_options[st.selectbox(f"Marker for {label}", list(marker_options.keys()), index=0, key=f"marker_{filename}")]
+        dataset_marker_sizes[filename] = st.slider(f"Marker size for {label}", 4, 20, 8, key=f"marker_size_{filename}")
+        dataset_line_styles[filename] = line_style_options[st.selectbox(f"Line style for {label}", list(line_style_options.keys()), index=0, key=f"linestyle_{filename}")]
+        dataset_line_widths[filename] = st.slider(f"Line width for {label}", 1, 6, 2, key=f"linewidth_{filename}")
 
     plot_title = st.text_input("Enter a title for the mirrored buoyancy plot:", value="")
-        # --- Mirrored Plot (nm axis, symmetric, clean layout) ---
+    
+    # --- Mirrored Plot (nm axis, symmetric, clean layout) ---
     fig, ax = plt.subplots(figsize=(8, 6))
 
     for filename, df, buoyancy_type in histogram_data:
@@ -213,7 +240,7 @@ if uploaded_files:
             markersize=dataset_marker_sizes[filename]
         )
 
-        # --- Axis and aesthetic formatting ---
+    # --- Axis and aesthetic formatting ---
     ax.axvline(0, color="black", linestyle="--", linewidth=1)
     ax.set_xlabel("Diameter [nm]", fontsize=12, labelpad=30)
     ax.set_ylabel("Concentration [#/mL]", fontsize=12)
@@ -235,8 +262,12 @@ if uploaded_files:
     import numpy as np
 
     # Determine automatic limits from data
-    auto_xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
+    if np.isnan(xlim):
+        xlim = 1000 
+        
+    auto_xlim = xlim
     auto_xlim_rounded = int(np.ceil(auto_xlim / 100.0) * 100)
+    if auto_xlim_rounded == 0: auto_xlim_rounded = 1000
 
     # --- Let user control each side independently ---
     st.subheader("Adjust X-Axis Range (Independent for Each Side)")
@@ -246,7 +277,7 @@ if uploaded_files:
         max_neg_nm = st.number_input(
             "Max diameter for negatively buoyant side [nm]",
             min_value=100,
-            max_value=5000,
+            max_value=10000,
             value=auto_xlim_rounded,
             step=100,
             help="Adjusts left-side range (negatively buoyant particles)."
@@ -256,7 +287,7 @@ if uploaded_files:
         max_pos_nm = st.number_input(
             "Max diameter for positively buoyant side [nm]",
             min_value=100,
-            max_value=5000,
+            max_value=10000,
             value=auto_xlim_rounded,
             step=100,
             help="Adjusts right-side range (positively buoyant particles)."
