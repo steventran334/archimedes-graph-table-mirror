@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from matplotlib.table import Table
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-import re  # Regex for grouping filenames
+import re  # Regex for grouping and sorting
 
 st.set_page_config(layout="wide")
 
@@ -69,6 +69,25 @@ def render_table_as_figure(df, title="Summary Table", col_width=3.0, row_height=
 uploaded_files = st.file_uploader("Upload one or more CSV files", type="csv", accept_multiple_files=True)
 
 if uploaded_files:
+    # --- NEW: Custom Sorting Logic (POS before NEG) ---
+    def get_file_sort_key(uploaded_file):
+        filename = uploaded_file.name
+        # Extract the base name (remove POS/NEG) to group files
+        base_name = re.sub(r'[\s_-]*\b(POS|NEG|pos|neg)\b[\s_-]*', '', filename.rsplit(".", 1)[0], flags=re.IGNORECASE).strip()
+        
+        # Assign priority: POS = 0 (first), NEG = 1 (second), Others = 2
+        if re.search(r'\bPOS\b', filename, re.IGNORECASE):
+            priority = 0
+        elif re.search(r'\bNEG\b', filename, re.IGNORECASE):
+            priority = 1
+        else:
+            priority = 2
+            
+        return (base_name, priority)
+
+    # Apply the sort so POS comes first in processing loop
+    uploaded_files = sorted(uploaded_files, key=get_file_sort_key)
+
     all_summaries = {}
     histogram_data = []
     dataset_labels = {}
@@ -132,7 +151,6 @@ if uploaded_files:
             "# Particles Measured": extract_value(summary_data, "# Particles Measured", 1, 2),
             "# Particles Detected": extract_value(summary_data, "# Particles Detected", 1, 2),
             "Coincidence (%)": extract_value(summary_data, "Coincidence [%]", 1, 2),
-            "Limit of Detection [μm]": extract_value(content, "Limit of Detection [μm]", 1, 2)
         }
 
         # Determine buoyancy from metadata (Positive or Negative)
