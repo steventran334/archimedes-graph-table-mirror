@@ -151,6 +151,7 @@ if uploaded_files:
             "# Particles Measured": extract_value(summary_data, "# Particles Measured", 1, 2),
             "# Particles Detected": extract_value(summary_data, "# Particles Detected", 1, 2),
             "Coincidence (%)": extract_value(summary_data, "Coincidence [%]", 1, 2),
+            "Limit of Detection [μm]": extract_value(content, "Limit of Detection [μm]", 1, 2)
         }
 
         # Determine buoyancy from metadata (Positive or Negative)
