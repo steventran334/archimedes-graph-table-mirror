@@ -69,7 +69,7 @@ def render_table_as_figure(df, title="Summary Table", col_width=3.0, row_height=
 uploaded_files = st.file_uploader("Upload one or more CSV files", type="csv", accept_multiple_files=True)
 
 if uploaded_files:
-    # --- NEW: Custom Sorting Logic (POS before NEG) ---
+    # --- Custom Sorting Logic (POS before NEG) ---
     def get_file_sort_key(uploaded_file):
         filename = uploaded_file.name
         # Extract the base name (remove POS/NEG) to group files
@@ -101,13 +101,28 @@ if uploaded_files:
 
     for uploaded_file in uploaded_files:
         filename = uploaded_file.name
-        content = uploaded_file.read().decode("utf-8").splitlines()
+        
+        # Safe read
+        try:
+            content = uploaded_file.read().decode("utf-8").splitlines()
+        except Exception as e:
+            st.error(f"Error reading {filename}: {e}")
+            continue
 
         # Section indices
         idx_summary = find_index(content, "SUMMARY DATA")
         idx_filters = find_index(content, "PARTICLE FILTERS")
         idx_stats = find_index(content, "SUMMARY STATISTICS")
         idx_dist_header = find_index(content, "Bin Start")
+
+        # --- SAFETY CHECK: Fix for TypeError (NoneType - int) ---
+        if idx_dist_header is None:
+            st.error(f"Error processing {filename}: Could not find 'Bin Start' header. Skipping this file.")
+            continue
+        if any(x is None for x in [idx_summary, idx_filters, idx_stats]):
+            st.error(f"Error processing {filename}: Missing required section headers (SUMMARY DATA, PARTICLE FILTERS, etc.). Skipping this file.")
+            continue
+        # --------------------------------------------------------
 
         # Sections
         summary_data = content[idx_summary + 1:idx_filters]
@@ -116,11 +131,15 @@ if uploaded_files:
         particle_distribution_lines = content[idx_dist_header:]
 
         # Histogram Data
-        df_dist = pd.read_csv(io.StringIO("\n".join(particle_distribution_lines)))
-        df_dist = df_dist[['Bin Center', 'Average']].copy()
-        df_dist = df_dist[~df_dist['Bin Center'].astype(str).str.contains('<|>')]
-        df_dist['Bin Center'] = pd.to_numeric(df_dist['Bin Center'], errors='coerce')
-        df_dist['Average'] = pd.to_numeric(df_dist['Average'], errors='coerce')
+        try:
+            df_dist = pd.read_csv(io.StringIO("\n".join(particle_distribution_lines)))
+            df_dist = df_dist[['Bin Center', 'Average']].copy()
+            df_dist = df_dist[~df_dist['Bin Center'].astype(str).str.contains('<|>')]
+            df_dist['Bin Center'] = pd.to_numeric(df_dist['Bin Center'], errors='coerce')
+            df_dist['Average'] = pd.to_numeric(df_dist['Average'], errors='coerce')
+        except Exception as e:
+            st.error(f"Error parsing histogram data for {filename}: {e}")
+            continue
 
         # Summary Table
         def convert_um_to_nm(value):
@@ -202,15 +221,16 @@ if uploaded_files:
         base_name = re.sub(r'[\s_-]*\b(POS|NEG|pos|neg)\b[\s_-]*', '', label, flags=re.IGNORECASE).strip()
         
         # Find which group this file belongs to
-        group_index = base_groups.index(base_name)
-        
-        # Pick color from cycle based on group index
-        default_color_name = default_cycle[group_index % len(default_cycle)]
+        if base_name in base_groups:
+            group_index = base_groups.index(base_name)
+            default_color_name = default_cycle[group_index % len(default_cycle)]
+        else:
+            default_color_name = "Black" # Fallback
         
         selected_color_name = st.selectbox(
             f"Color for {label}",
             generic_color_names,
-            index=generic_color_names.index(default_color_name),
+            index=generic_color_names.index(default_color_name) if default_color_name in generic_color_names else 0,
             key=f"color_{filename}"
         )
         dataset_colors[filename] = generic_colors[selected_color_name]
@@ -231,172 +251,173 @@ if uploaded_files:
     plot_title = st.text_input("Enter a title for the mirrored buoyancy plot:", value="")
     
     # --- Mirrored Plot (nm axis, symmetric, clean layout) ---
-    fig, ax = plt.subplots(figsize=(8, 6))
+    if histogram_data:
+        fig, ax = plt.subplots(figsize=(8, 6))
 
-    for filename, df, buoyancy_type in histogram_data:
-        df_clean = df.dropna(subset=["Bin Center", "Average"])
-        x = df_clean["Bin Center"] * 1000  # µm → nm
-        y = df_clean["Average"]
+        for filename, df, buoyancy_type in histogram_data:
+            df_clean = df.dropna(subset=["Bin Center", "Average"])
+            x = df_clean["Bin Center"] * 1000  # µm → nm
+            y = df_clean["Average"]
 
-        # Only affect the X-axis coordinate, do NOT append string to label
-        if buoyancy_type == "NEG":
-            x = -x
+            # Only affect the X-axis coordinate, do NOT append string to label
+            if buoyancy_type == "NEG":
+                x = -x
 
-        ax.plot(
-            x, y,
-            label=dataset_labels[filename], # No suffix added
-            color=dataset_colors[filename],
-            linestyle=dataset_line_styles[filename],
-            linewidth=dataset_line_widths[filename],
-            marker=dataset_markers[filename],
-            markersize=dataset_marker_sizes[filename]
-        )
+            ax.plot(
+                x, y,
+                label=dataset_labels[filename], # No suffix added
+                color=dataset_colors[filename],
+                linestyle=dataset_line_styles[filename],
+                linewidth=dataset_line_widths[filename],
+                marker=dataset_markers[filename],
+                markersize=dataset_marker_sizes[filename]
+            )
 
-    # --- Axis and aesthetic formatting ---
-    ax.axvline(0, color="black", linestyle="--", linewidth=1)
-    ax.set_xlabel("Diameter [nm]", fontsize=12, labelpad=30)
-    ax.set_ylabel("Concentration [#/mL]", fontsize=12)
-    ax.set_title(plot_title, fontsize=14, weight="bold")
+        # --- Axis and aesthetic formatting ---
+        ax.axvline(0, color="black", linestyle="--", linewidth=1)
+        ax.set_xlabel("Diameter [nm]", fontsize=12, labelpad=30)
+        ax.set_ylabel("Concentration [#/mL]", fontsize=12)
+        ax.set_title(plot_title, fontsize=14, weight="bold")
 
-    # Move x-axis spine to y=0 (directly under data)
-    ax.spines['bottom'].set_position(('data', 0))
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(True)
+        # Move x-axis spine to y=0 (directly under data)
+        ax.spines['bottom'].set_position(('data', 0))
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(True)
 
-    # Keep symmetric scale (initially)
-    xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
-    ax.set_xlim(-xlim, xlim)
+        # Keep symmetric scale (initially)
+        xlim = max(abs(ax.get_xlim()[0]), abs(ax.get_xlim()[1]))
+        ax.set_xlim(-xlim, xlim)
 
-    # ============================================================
-    # Independent adjustable X-axis ranges (NEG and POS sides)
-    # ============================================================
-    import numpy as np
+        # ============================================================
+        # Independent adjustable X-axis ranges (NEG and POS sides)
+        # ============================================================
+        import numpy as np
 
-    if np.isnan(xlim):
-        xlim = 1000 
+        if np.isnan(xlim):
+            xlim = 1000 
+            
+        auto_xlim = xlim
+        auto_xlim_rounded = int(np.ceil(auto_xlim / 100.0) * 100)
+        if auto_xlim_rounded == 0: auto_xlim_rounded = 1000
+
+        # --- Let user control each side independently ---
+        st.subheader("Adjust X-Axis Range (Independent for Each Side)")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            max_neg_nm = st.number_input(
+                "Max diameter for negatively buoyant side [nm]",
+                min_value=100,
+                max_value=10000,
+                value=auto_xlim_rounded,
+                step=100,
+                help="Adjusts left-side range (negatively buoyant particles)."
+            )
+
+        with col2:
+            max_pos_nm = st.number_input(
+                "Max diameter for positively buoyant side [nm]",
+                min_value=100,
+                max_value=10000,
+                value=auto_xlim_rounded,
+                step=100,
+                help="Adjusts right-side range (positively buoyant particles)."
+            )
+
+        # Apply the chosen ranges
+        ax.set_xlim(-max_neg_nm, max_pos_nm)
+
+        # --- Define consistent tick spacing ---
+        major_tick = 200
+        minor_tick = 100
+
+        # Create mirrored tick arrays that fit both sides nicely
+        major_ticks = np.arange(-max_neg_nm, max_pos_nm + major_tick, major_tick)
+        minor_ticks = np.arange(-max_neg_nm, max_pos_nm + minor_tick, minor_tick)
+
+        # Apply tick positions
+        ax.set_xticks(major_ticks)
+        ax.set_xticks(minor_ticks, minor=True)
+
+        # Label ticks as absolute values (remove negatives)
+        ax.set_xticklabels([f"{abs(int(t))}" if t != 0 else "0" for t in major_ticks])
+
+        # Tick styling
+        ax.tick_params(axis='x', which='major', length=6, width=1)
+        ax.tick_params(axis='x', which='minor', length=3, width=0.8)
+
+        # Optional: light gridlines
+        ax.grid(which='major', axis='x', linestyle=':', color='gray', alpha=0.4)
+
+        # Keep x-axis centered at y=0 (directly under distributions)
+        ax.spines['bottom'].set_position(('data', 0))
+        ax.spines['top'].set_visible(False)
+        ax.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
+
+        # --- Update region labels below the x-axis ---
+        ymin, ymax = ax.get_ylim()
+        label_y = -0.08 * ymax
+
+        ax.text(-max_neg_nm * 0.5, label_y, "Negatively Buoyant Particles",
+                ha="center", va="top", fontsize=12)
+        ax.text(max_pos_nm * 0.5, label_y, "Positively Buoyant Particles",
+                ha="center", va="top", fontsize=12)
         
-    auto_xlim = xlim
-    auto_xlim_rounded = int(np.ceil(auto_xlim / 100.0) * 100)
-    if auto_xlim_rounded == 0: auto_xlim_rounded = 1000
+        # Legend styling
+        legend = ax.legend(title="Datasets", loc="upper right", frameon=True)
+        legend.get_frame().set_edgecolor("black")
+        legend.get_frame().set_linewidth(0.8)
 
-    # --- Let user control each side independently ---
-    st.subheader("Adjust X-Axis Range (Independent for Each Side)")
-    col1, col2 = st.columns(2)
+        plt.tight_layout()
+        st.pyplot(fig)
 
-    with col1:
-        max_neg_nm = st.number_input(
-            "Max diameter for negatively buoyant side [nm]",
-            min_value=100,
-            max_value=10000,
-            value=auto_xlim_rounded,
-            step=100,
-            help="Adjusts left-side range (negatively buoyant particles)."
+        # --- Summary Table ---
+        combined_summary = pd.DataFrame(all_summaries)
+        st.subheader("Summary Table Comparison")
+        st.dataframe(combined_summary, use_container_width=True)
+        # --- Download Mirrored Plot as SVG ---
+        svg_buffer = BytesIO()
+        fig.savefig(svg_buffer, format="svg", bbox_inches="tight")
+        svg_data = svg_buffer.getvalue()
+        b64_svg = base64.b64encode(svg_data).decode("utf-8")
+        href_svg = f'<a href="data:image/svg+xml;base64,{b64_svg}" download="mirrored_buoyancy_plot.svg">📥 Download Mirrored Plot (SVG)</a>'
+        st.markdown(href_svg, unsafe_allow_html=True)
+
+        # --- Download Mirrored Plot as PNG ---
+        png_buffer = BytesIO()
+        fig.savefig(png_buffer, format="png", bbox_inches="tight", dpi=300)
+        png_data = png_buffer.getvalue()
+        b64_png = base64.b64encode(png_data).decode("utf-8")
+        href_png = f'<a href="data:image/png;base64,{b64_png}" download="mirrored_buoyancy_plot.png">📸 Download Mirrored Plot (PNG)</a>'
+        st.markdown(href_png, unsafe_allow_html=True)
+
+        # --- Download Summary Table as CSV ---
+        csv_buffer = StringIO()
+        combined_summary.to_csv(csv_buffer)
+        b64_csv = base64.b64encode(csv_buffer.getvalue().encode()).decode("utf-8")
+        href_csv = f'<a href="data:file/csv;base64,{b64_csv}" download="summary_table.csv">📥 Download Summary Table (CSV)</a>'
+        st.markdown(href_csv, unsafe_allow_html=True)
+
+        # --- Render Summary Table as Figure (SVG + PNG) ---
+        summary_fig = render_table_as_figure(combined_summary)
+        svg_table_buffer = BytesIO()
+        summary_fig.savefig(svg_table_buffer, format="svg", bbox_inches="tight")
+        svg_table_data = svg_table_buffer.getvalue()
+        b64_table_svg = base64.b64encode(svg_table_data).decode("utf-8")
+
+        st.markdown(
+            f'<a href="data:image/svg+xml;base64,{b64_table_svg}" download="summary_table.svg">📥 Download Summary Table (SVG)</a>',
+            unsafe_allow_html=True
         )
 
-    with col2:
-        max_pos_nm = st.number_input(
-            "Max diameter for positively buoyant side [nm]",
-            min_value=100,
-            max_value=10000,
-            value=auto_xlim_rounded,
-            step=100,
-            help="Adjusts right-side range (positively buoyant particles)."
+        # --- Download Summary Table as PNG ---
+        png_table_buffer = BytesIO()
+        summary_fig.savefig(png_table_buffer, format="png", bbox_inches="tight", dpi=200)
+        png_table_data = png_table_buffer.getvalue()
+        b64_table_png = base64.b64encode(png_table_data).decode("utf-8")
+
+        st.markdown(
+            f'<a href="data:image/png;base64,{b64_table_png}" download="summary_table.png">📸 Download Summary Table (PNG)</a>',
+            unsafe_allow_html=True
         )
-
-    # Apply the chosen ranges
-    ax.set_xlim(-max_neg_nm, max_pos_nm)
-
-    # --- Define consistent tick spacing ---
-    major_tick = 200
-    minor_tick = 100
-
-    # Create mirrored tick arrays that fit both sides nicely
-    major_ticks = np.arange(-max_neg_nm, max_pos_nm + major_tick, major_tick)
-    minor_ticks = np.arange(-max_neg_nm, max_pos_nm + minor_tick, minor_tick)
-
-    # Apply tick positions
-    ax.set_xticks(major_ticks)
-    ax.set_xticks(minor_ticks, minor=True)
-
-    # Label ticks as absolute values (remove negatives)
-    ax.set_xticklabels([f"{abs(int(t))}" if t != 0 else "0" for t in major_ticks])
-
-    # Tick styling
-    ax.tick_params(axis='x', which='major', length=6, width=1)
-    ax.tick_params(axis='x', which='minor', length=3, width=0.8)
-
-    # Optional: light gridlines
-    ax.grid(which='major', axis='x', linestyle=':', color='gray', alpha=0.4)
-
-    # Keep x-axis centered at y=0 (directly under distributions)
-    ax.spines['bottom'].set_position(('data', 0))
-    ax.spines['top'].set_visible(False)
-    ax.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=True)
-
-    # --- Update region labels below the x-axis ---
-    ymin, ymax = ax.get_ylim()
-    label_y = -0.08 * ymax
-
-    ax.text(-max_neg_nm * 0.5, label_y, "Negatively Buoyant Particles",
-            ha="center", va="top", fontsize=12)
-    ax.text(max_pos_nm * 0.5, label_y, "Positively Buoyant Particles",
-            ha="center", va="top", fontsize=12)
-    
-    # Legend styling
-    legend = ax.legend(title="Datasets", loc="upper right", frameon=True)
-    legend.get_frame().set_edgecolor("black")
-    legend.get_frame().set_linewidth(0.8)
-
-    plt.tight_layout()
-    st.pyplot(fig)
-
-    # --- Summary Table ---
-    combined_summary = pd.DataFrame(all_summaries)
-    st.subheader("Summary Table Comparison")
-    st.dataframe(combined_summary, use_container_width=True)
-    # --- Download Mirrored Plot as SVG ---
-    svg_buffer = BytesIO()
-    fig.savefig(svg_buffer, format="svg", bbox_inches="tight")
-    svg_data = svg_buffer.getvalue()
-    b64_svg = base64.b64encode(svg_data).decode("utf-8")
-    href_svg = f'<a href="data:image/svg+xml;base64,{b64_svg}" download="mirrored_buoyancy_plot.svg">📥 Download Mirrored Plot (SVG)</a>'
-    st.markdown(href_svg, unsafe_allow_html=True)
-
-    # --- Download Mirrored Plot as PNG ---
-    png_buffer = BytesIO()
-    fig.savefig(png_buffer, format="png", bbox_inches="tight", dpi=300)
-    png_data = png_buffer.getvalue()
-    b64_png = base64.b64encode(png_data).decode("utf-8")
-    href_png = f'<a href="data:image/png;base64,{b64_png}" download="mirrored_buoyancy_plot.png">📸 Download Mirrored Plot (PNG)</a>'
-    st.markdown(href_png, unsafe_allow_html=True)
-
-    # --- Download Summary Table as CSV ---
-    csv_buffer = StringIO()
-    combined_summary.to_csv(csv_buffer)
-    b64_csv = base64.b64encode(csv_buffer.getvalue().encode()).decode("utf-8")
-    href_csv = f'<a href="data:file/csv;base64,{b64_csv}" download="summary_table.csv">📥 Download Summary Table (CSV)</a>'
-    st.markdown(href_csv, unsafe_allow_html=True)
-
-    # --- Render Summary Table as Figure (SVG + PNG) ---
-    summary_fig = render_table_as_figure(combined_summary)
-    svg_table_buffer = BytesIO()
-    summary_fig.savefig(svg_table_buffer, format="svg", bbox_inches="tight")
-    svg_table_data = svg_table_buffer.getvalue()
-    b64_table_svg = base64.b64encode(svg_table_data).decode("utf-8")
-
-    st.markdown(
-        f'<a href="data:image/svg+xml;base64,{b64_table_svg}" download="summary_table.svg">📥 Download Summary Table (SVG)</a>',
-        unsafe_allow_html=True
-    )
-
-    # --- Download Summary Table as PNG ---
-    png_table_buffer = BytesIO()
-    summary_fig.savefig(png_table_buffer, format="png", bbox_inches="tight", dpi=200)
-    png_table_data = png_table_buffer.getvalue()
-    b64_table_png = base64.b64encode(png_table_data).decode("utf-8")
-
-    st.markdown(
-        f'<a href="data:image/png;base64,{b64_table_png}" download="summary_table.png">📸 Download Summary Table (PNG)</a>',
-        unsafe_allow_html=True
-    )
