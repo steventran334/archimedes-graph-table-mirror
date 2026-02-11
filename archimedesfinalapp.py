@@ -69,28 +69,6 @@ def render_table_as_figure(df, title="Summary Table", col_width=3.0, row_height=
 uploaded_files = st.file_uploader("Upload one or more CSV files", type="csv", accept_multiple_files=True)
 
 if uploaded_files:
-    # --- Custom Sorting Logic (POS before NEG) ---
-    def get_file_sort_key(uploaded_file):
-        filename = uploaded_file.name
-        # Extract the base name (remove POS/NEG) to group files
-        base_name = re.sub(r'[\s_-]*\b(POS|NEG|pos|neg)\b[\s_-]*', '', filename.rsplit(".", 1)[0], flags=re.IGNORECASE).strip()
-        
-        # Assign priority: POS = 0 (first), NEG = 1 (second), Others = 2
-        if re.search(r'\bPOS\b', filename, re.IGNORECASE):
-            priority = 0
-        elif re.search(r'\bNEG\b', filename, re.IGNORECASE):
-            priority = 1
-        else:
-            priority = 2
-            
-        return (base_name, priority)
-
-    # Apply the sort so POS comes first in processing loop
-    uploaded_files = sorted(uploaded_files, key=get_file_sort_key)
-
-    all_summaries = {}
-    histogram_data = []
-    dataset_labels = {}
 
     st.subheader("Customize Dataset Names")
     for uploaded_file in uploaded_files:
