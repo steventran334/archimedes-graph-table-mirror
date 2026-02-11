@@ -70,6 +70,10 @@ uploaded_files = st.file_uploader("Upload one or more CSV files", type="csv", ac
 
 if uploaded_files:
 
+    
+    all_summaries = {}
+    histogram_data = []
+    dataset_labels = {}
     st.subheader("Customize Dataset Names")
     for uploaded_file in uploaded_files:
         filename = uploaded_file.name
