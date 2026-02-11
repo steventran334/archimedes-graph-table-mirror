@@ -299,7 +299,7 @@ if uploaded_files:
         with col1:
             max_neg_nm = st.number_input(
                 "Max diameter for negatively buoyant side [nm]",
-                min_value=100,
+                min_value=0,
                 max_value=10000,
                 value=auto_xlim_rounded,
                 step=100,
