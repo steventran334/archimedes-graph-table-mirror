@@ -155,21 +155,53 @@ if raw_uploaded_files:
             all_summaries[dataset_labels[filename]] = summary_table
             histogram_data.append((filename, df_dist, buoyancy_type))
 
-        # --- Color selection ---
+        # --- Color selection with Automatic Pairing ---
         st.subheader("Step 3: Appearance Settings")
-        generic_colors = {"Red": "#d62728", "Blue": "#1f77b4", "Green": "#2ca02c", "Purple": "#9467bd", "Black": "#000000", "Orange": "#ff7f0e", "Brown": "#8c564b", "Pink": "#e377c2", "Olive": "#bcbd22", "Cyan": "#17becf", "Gray": "#7f7f7f"}
+        
+        generic_colors = {
+            "Red": "#d62728", "Blue": "#1f77b4", "Green": "#2ca02c", 
+            "Purple": "#9467bd", "Black": "#000000", "Orange": "#ff7f0e", 
+            "Brown": "#8c564b", "Pink": "#e377c2", "Olive": "#bcbd22", 
+            "Cyan": "#17becf", "Gray": "#7f7f7f"
+        }
         generic_color_names = list(generic_colors.keys())
-        default_cycle = ["Red", "Blue", "Green", "Purple", "Black"]
-
+        default_cycle = ["Red", "Blue", "Green", "Purple", "Black", "Orange", "Brown"]
+        
+        # 1. Identify Unique Base Groups to ensure pairs share a color index
+        unique_groups = []
+        group_map = {}
+        
+        for filename, _, _ in histogram_data:
+            label = dataset_labels[filename]
+            # Regex strips 'POS' or 'NEG' (case insensitive) and surrounding separators
+            base_name = re.sub(r'[\s_-]*\b(POS|NEG)\b[\s_-]*', '', label, flags=re.IGNORECASE).strip()
+            
+            if base_name not in unique_groups:
+                unique_groups.append(base_name)
+            group_map[filename] = base_name
+        
         dataset_colors, dataset_markers, dataset_marker_sizes, dataset_line_styles, dataset_line_widths = {}, {}, {}, {}, {}
         
         for i, (filename, _, _) in enumerate(histogram_data):
             label = dataset_labels[filename]
+            base_group = group_map[filename]
+            
+            # Find the index of the base group to determine the default color
+            group_index = unique_groups.index(base_group)
+            default_color_name = default_cycle[group_index % len(default_cycle)]
+            
             col_c1, col_c2, col_c3, col_c4, col_c5 = st.columns([2, 1, 1, 1, 1])
             
             with col_c1:
-                selected_color = st.selectbox(f"Color: {label}", generic_color_names, index=i % len(default_cycle), key=f"c_{filename}")
+                # The index is set based on the group_index, so "Sample A POS" and "Sample A NEG" match
+                selected_color = st.selectbox(
+                    f"Color: {label}", 
+                    generic_color_names, 
+                    index=generic_color_names.index(default_color_name), 
+                    key=f"c_{filename}"
+                )
                 dataset_colors[filename] = generic_colors[selected_color]
+                
             with col_c2:
                 dataset_markers[filename] = st.selectbox(f"Marker: {label}", ["None", "o", "^", "s", "D", "*"], key=f"m_{filename}")
             with col_c3:
