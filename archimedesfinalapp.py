@@ -229,7 +229,7 @@ if raw_uploaded_files:
 
             # Formatting
             ax.axvline(0, color="black", linestyle="--", linewidth=1)
-            ax.set_xlabel("Diameter [nm]", fontsize=12, labelpad=20)
+            ax.set_xlabel("Diameter [nm]", fontsize=12, labelpad=35) # Increased labelpad for room
             ax.set_ylabel("Concentration [#/mL]", fontsize=12)
             ax.set_title(plot_title, fontsize=14, weight="bold")
             
@@ -242,9 +242,25 @@ if raw_uploaded_files:
             ax.set_xlim(-max_neg, max_pos)
             ticks = ax.get_xticks()
             ax.set_xticklabels([str(abs(int(t))) for t in ticks])
-            ax.spines['bottom'].set_position(('data', 0))
-            ax.legend(loc="upper right")
             
+            # Keep x-axis spine at y=0
+            ax.spines['bottom'].set_position(('data', 0))
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+
+            # --- ADDING REGION LABELS BACK IN ---
+            ymin, ymax = ax.get_ylim()
+            label_y = -0.12 * ymax  # Position labels slightly below the axis
+
+            ax.text(-max_neg * 0.5, label_y, "Negatively Buoyant Particles", 
+                    ha="center", va="top", fontsize=11, fontweight="bold", color="#555555")
+            ax.text(max_pos * 0.5, label_y, "Positively Buoyant Particles", 
+                    ha="center", va="top", fontsize=11, fontweight="bold", color="#555555")
+            # ------------------------------------
+
+            ax.legend(loc="upper right", frameon=True).get_frame().set_linewidth(0.8)
+            
+            plt.tight_layout()
             st.pyplot(fig)
 
             # Summary Table
