@@ -76,7 +76,7 @@ if raw_uploaded_files:
     
     st.subheader("Step 1: Define File Order & Selection")
     
-    # Changed default=file_names to default=None to prevent automatic selection
+    # Default=None prevents automatic selection
     ordered_filenames = st.multiselect(
         "Select files in the order you want them to appear (click to add)",
         options=file_names,
@@ -193,7 +193,6 @@ if raw_uploaded_files:
             col_c1, col_c2, col_c3, col_c4, col_c5 = st.columns([2, 1, 1, 1, 1])
             
             with col_c1:
-                # The index is set based on the group_index, so "Sample A POS" and "Sample A NEG" match
                 selected_color = st.selectbox(
                     f"Color: {label}", 
                     generic_color_names, 
@@ -229,7 +228,7 @@ if raw_uploaded_files:
 
             # Formatting
             ax.axvline(0, color="black", linestyle="--", linewidth=1)
-            # Increased labelpad to make room for the region labels below
+            # Standard labelpad
             ax.set_xlabel("Diameter [nm]", fontsize=12, labelpad=30) 
             ax.set_ylabel("Concentration [#/mL]", fontsize=12)
             ax.set_title(plot_title, fontsize=14, weight="bold")
@@ -244,22 +243,22 @@ if raw_uploaded_files:
             ticks = ax.get_xticks()
             ax.set_xticklabels([str(abs(int(t))) for t in ticks])
             
-            # Move spine to y=0
-            ax.spines['bottom'].set_position(('data', 0))
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
+            # --- BOX RESTORATION ---
+            # Removed the lines that hid the top/right spines
+            # Removed the line that moved bottom spine to 'data 0'
+            # This restores the standard matplotlib "black box" frame
             
-            # --- ADD LABELS BACK IN ---
+            # --- ADD LABELS BACK IN (Standard Font) ---
             ymin, ymax = ax.get_ylim()
-            label_y = -0.12 * ymax  # Position text 12% below the axis line
+            label_y = -0.12 * ymax 
             
-            # Label for Negative Side
+            # Label for Negative Side (Removed bold/color args to match standard look)
             ax.text(-max_neg * 0.5, label_y, "Negatively Buoyant Particles", 
-                    ha="center", va="top", fontsize=11, fontweight="bold", color="#555555")
+                    ha="center", va="top", fontsize=12, color="black")
             
-            # Label for Positive Side
+            # Label for Positive Side (Removed bold/color args to match standard look)
             ax.text(max_pos * 0.5, label_y, "Positively Buoyant Particles", 
-                    ha="center", va="top", fontsize=11, fontweight="bold", color="#555555")
+                    ha="center", va="top", fontsize=12, color="black")
             # --------------------------
 
             ax.legend(loc="upper right", frameon=True).get_frame().set_linewidth(0.8)
