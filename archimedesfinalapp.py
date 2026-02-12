@@ -228,6 +228,11 @@ if raw_uploaded_files:
 
             # Formatting
             ax.axvline(0, color="black", linestyle="--", linewidth=1)
+            
+            # --- FIX: FORCE Y-AXIS TO START AT 0 ---
+            ax.set_ylim(bottom=0)
+            # ---------------------------------------
+
             # Standard labelpad
             ax.set_xlabel("Diameter [nm]", fontsize=12, labelpad=30) 
             ax.set_ylabel("Concentration [#/mL]", fontsize=12)
@@ -243,20 +248,13 @@ if raw_uploaded_files:
             ticks = ax.get_xticks()
             ax.set_xticklabels([str(abs(int(t))) for t in ticks])
             
-            # --- BOX RESTORATION ---
-            # Removed the lines that hid the top/right spines
-            # Removed the line that moved bottom spine to 'data 0'
-            # This restores the standard matplotlib "black box" frame
-            
             # --- ADD LABELS BACK IN (Standard Font) ---
             ymin, ymax = ax.get_ylim()
             label_y = -0.12 * ymax 
             
-            # Label for Negative Side (Removed bold/color args to match standard look)
             ax.text(-max_neg * 0.5, label_y, "Negatively Buoyant Particles", 
                     ha="center", va="top", fontsize=12, color="black")
             
-            # Label for Positive Side (Removed bold/color args to match standard look)
             ax.text(max_pos * 0.5, label_y, "Positively Buoyant Particles", 
                     ha="center", va="top", fontsize=12, color="black")
             # --------------------------
