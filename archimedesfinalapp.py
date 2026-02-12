@@ -250,7 +250,7 @@ if raw_uploaded_files:
             
             # --- ADD LABELS BACK IN (Standard Font) ---
             ymin, ymax = ax.get_ylim()
-            label_y = -0.12 * ymax 
+            label_y = -0.07 * ymax 
             
             ax.text(-max_neg * 0.5, label_y, "Negatively Buoyant Particles", 
                     ha="center", va="top", fontsize=12, color="black")
