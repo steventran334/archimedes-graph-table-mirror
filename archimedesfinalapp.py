@@ -69,32 +69,20 @@ def render_table_as_figure(df, title="Summary Table", col_width=3.0, row_height=
 raw_uploaded_files = st.file_uploader("Upload one or more CSV files", type="csv", accept_multiple_files=True)
 
 if raw_uploaded_files:
-from streamlit_reorderable_list import reorderable_list
-
-# --- FILE SELECTION & DRAG-REORDERING ---
+    # --- FILE REORDERING FEATURE ---
+    # Map filenames to file objects
     file_dict = {f.name: f for f in raw_uploaded_files}
     file_names = list(file_dict.keys())
     
     st.subheader("Step 1: Define File Order & Selection")
     
-    # Use an expander to pick which files to include initially
-    with st.expander("Click here to select/deselect files"):
-        selected_for_list = st.multiselect(
-            "Choose files to include in the plot:",
-            options=file_names,
-            default=file_names
-        )
-    
-    if selected_for_list:
-        st.info("Drag the handles (⠿) to rearrange the files:")
-        # This is the draggable component
-        ordered_filenames = reorderable_list(selected_for_list)
-        
-        # Update the file list based on the new order
-        uploaded_files = [file_dict[name] for name in ordered_filenames]
-    else:
-        st.warning("Please select at least one file to begin.")
-        uploaded_files = []
+    # Changed default=file_names to default=None to prevent automatic selection
+    ordered_filenames = st.multiselect(
+        "Select files in the order you want them to appear (click to add)",
+        options=file_names,
+        default=None,  
+        help="Files will appear in the legend and table in the order you select them here."
+    )
         
     # Create the final list based on user selection
     uploaded_files = [file_dict[name] for name in ordered_filenames]
