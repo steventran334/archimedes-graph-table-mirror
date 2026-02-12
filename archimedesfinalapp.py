@@ -84,8 +84,8 @@ if raw_uploaded_files:
         help="Files will appear in the legend and table in the order you select them here."
     )
         
-        # Create the final list based on user selection
-        uploaded_files = [file_dict[name] for name in ordered_filenames]
+    # Create the final list based on user selection
+    uploaded_files = [file_dict[name] for name in ordered_filenames]
 
     all_summaries = {}
     histogram_data = []
