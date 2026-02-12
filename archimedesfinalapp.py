@@ -69,21 +69,23 @@ def render_table_as_figure(df, title="Summary Table", col_width=3.0, row_height=
 raw_uploaded_files = st.file_uploader("Upload one or more CSV files", type="csv", accept_multiple_files=True)
 
 if raw_uploaded_files:
-    # --- FILE REORDERING FEATURE ---
-    # Map filenames to file objects
-    file_dict = {f.name: f for f in raw_uploaded_files}
-    file_names = list(file_dict.keys())
-    
-    st.subheader("Step 1: Define File Order & Selection")
-    ordered_filenames = st.multiselect(
-        "Select and reorder files (drag and drop or click to add in order)",
-        options=file_names,
-        default=file_names,
-        help="The order selected here determines the order in the legend and summary table."
-    )
-    
-    # Create the final list based on user selection
-    uploaded_files = [file_dict[name] for name in ordered_filenames]
+        # --- FILE REORDERING FEATURE ---
+        # Map filenames to file objects
+        file_dict = {f.name: f for f in raw_uploaded_files}
+        file_names = list(file_dict.keys())
+        
+        st.subheader("Step 1: Define File Order & Selection")
+        
+        # Changed default=file_names to default=None to prevent automatic selection
+        ordered_filenames = st.multiselect(
+            "Select files in the order you want them to appear (click to add)",
+            options=file_names,
+            default=None,  
+            help="Files will appear in the legend and table in the order you select them here."
+        )
+        
+        # Create the final list based on user selection
+        uploaded_files = [file_dict[name] for name in ordered_filenames]
 
     all_summaries = {}
     histogram_data = []
