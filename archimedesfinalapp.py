@@ -266,7 +266,7 @@ if raw_uploaded_files:
 
            # Summary Table
             combined_summary = pd.DataFrame(all_summaries)
-            st.subheader("Summary Table")
+            st.subheader("Summary Table (blue - positively buoyant particles, red - negatively buoyant particles")
 
             # Define the styling function to color columns based on Buoyancy Type
             def highlight_buoyancy(col):
