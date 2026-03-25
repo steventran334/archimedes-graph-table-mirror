@@ -287,7 +287,13 @@ if raw_uploaded_files:
             # Render the styled dataframe
             st.dataframe(styled_summary, use_container_width=True)
 
-# --- Download Table as Image Feature ---
+# Apply the style across columns (axis=0)
+            styled_summary = combined_summary.style.apply(highlight_buoyancy, axis=0)
+            
+            # Render the styled dataframe
+            st.dataframe(styled_summary, use_container_width=True)
+
+            # --- Download Table as Image Feature ---
             def get_table_image_bytes(df):
                 # Build a color matrix matching the shape of the dataframe
                 cell_colors = []
@@ -331,3 +337,11 @@ if raw_uploaded_files:
                 plt.close(fig)
                 buf.seek(0)
                 return buf
+
+            # --- Render the Download Button ---
+            st.download_button(
+                label="📷 Download Table as Image",
+                data=get_table_image_bytes(combined_summary),
+                file_name="Archimedes_Summary_Table.png",
+                mime="image/png"
+            )
