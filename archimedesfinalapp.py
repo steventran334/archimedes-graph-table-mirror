@@ -303,35 +303,31 @@ if raw_uploaded_files:
                             row_colors.append('#ffffff')  # White Hex
                     cell_colors.append(row_colors)
 
-                # Create figure sizing dynamically based on table size
-                fig, ax = plt.subplots(figsize=(3 * df.shape[1] + 2, 0.6 * df.shape[0]))
+                # Dynamically calculate exact figure size to prevent stretching/squishing
+                # Width: ~2.5 inches per data column + 2.5 inches for the row labels
+                # Height: ~0.35 inches per row (including header)
+                fig_width = 2.5 * df.shape[1] + 2.5
+                fig_height = 0.35 * (df.shape[0] + 1)
+                
+                fig, ax = plt.subplots(figsize=(fig_width, fig_height))
                 ax.axis('off')
                 
-                # Render the table via Matplotlib
+                # Render the table and force it to fill 100% of the bounding box
                 mpl_table = ax.table(
                     cellText=df.values,
                     rowLabels=df.index,
                     colLabels=df.columns,
                     cellColours=cell_colors,
-                    loc='center',
-                    cellLoc='center'
+                    bbox=[0, 0, 1, 1]  # Forces table to stretch to the figure edges
                 )
                 
                 # Table formatting
                 mpl_table.auto_set_font_size(False)
                 mpl_table.set_fontsize(12)
-                mpl_table.scale(1.2, 1.5)
                 
-                # Save to in-memory buffer
+                # Save to in-memory buffer with minimal padding
                 buf = BytesIO()
-                fig.savefig(buf, format="png", bbox_inches="tight", dpi=300)
-                plt.close(fig)  # Close the figure to free memory
+                fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0.05, dpi=300)
+                plt.close(fig)
                 buf.seek(0)
                 return buf
-
-            st.download_button(
-                label="📷 Download Table as Image",
-                data=get_table_image_bytes(combined_summary),
-                file_name="Archimedes_Summary_Table.png",
-                mime="image/png"
-            )
