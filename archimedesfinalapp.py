@@ -50,21 +50,6 @@ def extract_value(lines, key, key_index=1, value_index=2):
 def find_index(lines, start_text):
     return next((i for i, line in enumerate(lines) if line.strip().startswith(start_text)), None)
 
-def render_table_as_figure(df, title="Summary Table", col_width=3.0, row_height=0.625, font_size=14):
-    fig, ax = plt.subplots(figsize=(col_width * (df.shape[1] + 1), row_height * (df.shape[0] + 1)))
-    ax.axis('off')
-    mpl_table = ax.table(
-        cellText=df.values,
-        rowLabels=df.index,
-        colLabels=df.columns,
-        loc='center',
-        cellLoc='center'
-    )
-    mpl_table.auto_set_font_size(False)
-    mpl_table.set_fontsize(font_size)
-    mpl_table.scale(1.2, 1.2)
-    return fig
-
 # --- Upload multiple CSVs ---
 raw_uploaded_files = st.file_uploader("Upload one or more CSV files", type="csv", accept_multiple_files=True)
 
@@ -264,7 +249,7 @@ if raw_uploaded_files:
             plt.tight_layout()
             st.pyplot(fig)
 
-           # Summary Table
+            # Summary Table
             combined_summary = pd.DataFrame(all_summaries)
             st.subheader("Summary Table (blue - positively buoyant particles, red - negatively buoyant particles)")
 
@@ -284,13 +269,7 @@ if raw_uploaded_files:
             # Apply the style across columns (axis=0)
             styled_summary = combined_summary.style.apply(highlight_buoyancy, axis=0)
             
-            # Render the styled dataframe
-            st.dataframe(styled_summary, use_container_width=True)
-
-# Apply the style across columns (axis=0)
-            styled_summary = combined_summary.style.apply(highlight_buoyancy, axis=0)
-            
-            # Render the styled dataframe
+            # Render the styled dataframe ONCE
             st.dataframe(styled_summary, use_container_width=True)
 
             # --- Download Table as Image Feature ---
