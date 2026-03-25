@@ -286,3 +286,52 @@ if raw_uploaded_files:
             
             # Render the styled dataframe
             st.dataframe(styled_summary, use_container_width=True)
+
+# --- Download Table as Image Feature ---
+            def get_table_image_bytes(df):
+                # Build a color matrix matching the shape of the dataframe
+                cell_colors = []
+                for row_idx in range(df.shape[0]):
+                    row_colors = []
+                    for col_name in df.columns:
+                        buoy_type = df.loc['Buoyancy Type', col_name] if 'Buoyancy Type' in df.index else ''
+                        if buoy_type == 'POS':
+                            row_colors.append('#e6f2ff')  # Light Blue Hex
+                        elif buoy_type == 'NEG':
+                            row_colors.append('#ffe6e6')  # Light Red Hex
+                        else:
+                            row_colors.append('#ffffff')  # White Hex
+                    cell_colors.append(row_colors)
+
+                # Create figure sizing dynamically based on table size
+                fig, ax = plt.subplots(figsize=(3 * df.shape[1] + 2, 0.6 * df.shape[0]))
+                ax.axis('off')
+                
+                # Render the table via Matplotlib
+                mpl_table = ax.table(
+                    cellText=df.values,
+                    rowLabels=df.index,
+                    colLabels=df.columns,
+                    cellColours=cell_colors,
+                    loc='center',
+                    cellLoc='center'
+                )
+                
+                # Table formatting
+                mpl_table.auto_set_font_size(False)
+                mpl_table.set_fontsize(12)
+                mpl_table.scale(1.2, 1.5)
+                
+                # Save to in-memory buffer
+                buf = BytesIO()
+                fig.savefig(buf, format="png", bbox_inches="tight", dpi=300)
+                plt.close(fig)  # Close the figure to free memory
+                buf.seek(0)
+                return buf
+
+            st.download_button(
+                label="📷 Download Table as Image",
+                data=get_table_image_bytes(combined_summary),
+                file_name="Archimedes_Summary_Table.png",
+                mime="image/png"
+            )
