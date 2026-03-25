@@ -264,7 +264,25 @@ if raw_uploaded_files:
             plt.tight_layout()
             st.pyplot(fig)
 
-            # Summary Table
+           # Summary Table
             combined_summary = pd.DataFrame(all_summaries)
             st.subheader("Summary Table")
-            st.dataframe(combined_summary, use_container_width=True)
+
+            # Define the styling function to color columns based on Buoyancy Type
+            def highlight_buoyancy(col):
+                # Retrieve the value from the 'Buoyancy Type' row for the current column
+                buoy_type = col.get('Buoyancy Type', '')
+                
+                # Apply light blue for POS, light red for NEG, default for others
+                if buoy_type == 'POS':
+                    return ['background-color: rgba(0, 119, 255, 0.1)'] * len(col) 
+                elif buoy_type == 'NEG':
+                    return ['background-color: rgba(255, 0, 0, 0.1)'] * len(col)
+                else:
+                    return [''] * len(col)
+
+            # Apply the style across columns (axis=0)
+            styled_summary = combined_summary.style.apply(highlight_buoyancy, axis=0)
+            
+            # Render the styled dataframe
+            st.dataframe(styled_summary, use_container_width=True)
