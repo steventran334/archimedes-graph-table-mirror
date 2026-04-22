@@ -50,18 +50,33 @@ def extract_value(lines, key, key_index=1, value_index=2):
 def find_index(lines, start_text):
     return next((i for i, line in enumerate(lines) if line.strip().startswith(start_text)), None)
 
+def calculate_pdi(mean_nm_str, stdev_nm_str):
+    """
+    Calculate PDI using the standard nanoparticle formula:
+    PDI = (σ / μ)²
+    where σ = standard deviation and μ = mean particle diameter.
+    Returns a formatted string or 'N/A' if inputs are invalid.
+    """
+    try:
+        mean = float(mean_nm_str)
+        stdev = float(stdev_nm_str)
+        if mean == 0:
+            return "N/A"
+        pdi = (stdev / mean) ** 2
+        return f"{pdi:.4f}"
+    except (ValueError, TypeError):
+        return "N/A"
+
 # --- Upload multiple CSVs ---
 raw_uploaded_files = st.file_uploader("Upload one or more CSV files", type="csv", accept_multiple_files=True)
 
 if raw_uploaded_files:
     # --- FILE REORDERING FEATURE ---
-    # Map filenames to file objects
     file_dict = {f.name: f for f in raw_uploaded_files}
     file_names = list(file_dict.keys())
     
     st.subheader("Step 1: Define File Order & Selection")
     
-    # Default=None prevents automatic selection
     ordered_filenames = st.multiselect(
         "Select files in the order you want them to appear (click to add)",
         options=file_names,
@@ -69,7 +84,6 @@ if raw_uploaded_files:
         help="Files will appear in the legend and table in the order you select them here."
     )
         
-    # Create the final list based on user selection
     uploaded_files = [file_dict[name] for name in ordered_filenames]
 
     all_summaries = {}
@@ -119,11 +133,15 @@ if raw_uploaded_files:
                     return f"{total_seconds // 60:02}:{total_seconds % 60:02}"
                 except: return "N/A"
 
+            mean_nm  = convert_um_to_nm(extract_value(real_stats, "Mean [μm]", 1, 3))
+            stdev_nm = convert_um_to_nm(extract_value(real_stats, "Stdev [μm]", 1, 3))
+
             summary_table = {
-                "Mean [nm]": convert_um_to_nm(extract_value(real_stats, "Mean [μm]", 1, 3)),
-                "Stdev [nm]": convert_um_to_nm(extract_value(real_stats, "Stdev [μm]", 1, 3)),
+                "Mean [nm]": mean_nm,
+                "Stdev [nm]": stdev_nm,
                 "Mode [nm]": convert_um_to_nm(extract_value(real_stats, "Mode [μm]", 1, 3)),
-                "Polydispersity": extract_value(real_stats, "Polydispersity", 1, 3),
+                # PDI = (σ/μ)² using mean and stdev in nm
+                "PDI": calculate_pdi(mean_nm, stdev_nm),
                 "Standard Error [μm]": extract_value(real_stats, "Standard Error [μm]", 1, 3),
                 "Concentration [#/mL]": extract_value(real_stats, "Concentration [#/mL]", 1, 3),
                 "Experiment Duration [mm:ss]": convert_seconds_to_min_sec(extract_value(summary_data, "Experiment Duration [s]", 1, 2)),
@@ -152,15 +170,12 @@ if raw_uploaded_files:
         generic_color_names = list(generic_colors.keys())
         default_cycle = ["Red", "Blue", "Green", "Purple", "Black", "Orange", "Brown"]
         
-        # 1. Identify Unique Base Groups to ensure pairs share a color index
         unique_groups = []
         group_map = {}
         
         for filename, _, _ in histogram_data:
             label = dataset_labels[filename]
-            # Regex strips 'POS' or 'NEG' (case insensitive) and surrounding separators
             base_name = re.sub(r'[\s_-]*\b(POS|NEG)\b[\s_-]*', '', label, flags=re.IGNORECASE).strip()
-            
             if base_name not in unique_groups:
                 unique_groups.append(base_name)
             group_map[filename] = base_name
@@ -170,8 +185,6 @@ if raw_uploaded_files:
         for i, (filename, _, _) in enumerate(histogram_data):
             label = dataset_labels[filename]
             base_group = group_map[filename]
-            
-            # Find the index of the base group to determine the default color
             group_index = unique_groups.index(base_group)
             default_color_name = default_cycle[group_index % len(default_cycle)]
             
@@ -196,128 +209,151 @@ if raw_uploaded_files:
                 dataset_line_widths[filename] = st.slider(f"Width: {label}", 1, 6, 2, key=f"lw_{filename}")
 
         plot_title = st.text_input("Plot Title:", value="")
-        
-        # --- Plotting ---
+
+        # --- X-Axis Range (shared between both plots) ---
+        st.subheader("Step 4: Adjust X-Axis Range")
+        xc1, xc2 = st.columns(2)
+        with xc1: max_neg = st.number_input("Left Side Max (NEG)", 0, 10000, 1000, 100)
+        with xc2: max_pos = st.number_input("Right Side Max (POS)", 100, 10000, 1000, 100)
+
+        # -------------------------------------------------------
+        # Helper: shared plot styling applied to any given axes
+        # -------------------------------------------------------
+        def style_axes(ax, title_str):
+            ax.axvline(0, color="black", linestyle="--", linewidth=1)
+            ax.set_ylim(bottom=0)
+            ax.set_xlabel("Diameter [nm]", fontsize=12, labelpad=30)
+            ax.set_title(title_str, fontsize=14, weight="bold")
+            ax.set_xlim(-max_neg, max_pos)
+            ticks = ax.get_xticks()
+            ax.set_xticklabels([str(abs(int(t))) for t in ticks])
+
+            ymin, ymax = ax.get_ylim()
+            label_y = -0.07 * ymax
+            ax.text(-max_neg * 0.5, label_y, "Negatively Buoyant Particles",
+                    ha="center", va="top", fontsize=12, color="black")
+            ax.text(max_pos * 0.5, label_y, "Positively Buoyant Particles",
+                    ha="center", va="top", fontsize=12, color="black")
+
+            ax.legend(loc="upper right", frameon=True).get_frame().set_linewidth(0.8)
+            plt.tight_layout()
+
+        # -------------------------------------------------------
+        # Plot 1 – Raw concentration
+        # -------------------------------------------------------
         if histogram_data:
+            st.subheader("Raw Concentration Plot")
             fig, ax = plt.subplots(figsize=(10, 7))
+
             for filename, df, buoyancy_type in histogram_data:
                 df_clean = df.dropna(subset=["Bin Center", "Average"])
                 x = df_clean["Bin Center"] * 1000
                 y = df_clean["Average"]
-                if buoyancy_type == "NEG": x = -x
+                if buoyancy_type == "NEG":
+                    x = -x
 
-                ax.plot(x, y, label=dataset_labels[filename], color=dataset_colors[filename],
-                        linestyle=dataset_line_styles[filename], linewidth=dataset_line_widths[filename],
-                        marker=None if dataset_markers[filename]=="None" else dataset_markers[filename],
+                ax.plot(x, y,
+                        label=dataset_labels[filename],
+                        color=dataset_colors[filename],
+                        linestyle=dataset_line_styles[filename],
+                        linewidth=dataset_line_widths[filename],
+                        marker=None if dataset_markers[filename] == "None" else dataset_markers[filename],
                         markersize=dataset_marker_sizes[filename])
 
-            # Formatting
-            ax.axvline(0, color="black", linestyle="--", linewidth=1)
-            
-            # --- FIX: FORCE Y-AXIS TO START AT 0 ---
-            ax.set_ylim(bottom=0)
-            # ---------------------------------------
-
-            # Standard labelpad
-            ax.set_xlabel("Diameter [nm]", fontsize=12, labelpad=30) 
             ax.set_ylabel("Concentration [#/mL]", fontsize=12)
-            ax.set_title(plot_title, fontsize=14, weight="bold")
-            
-            # X-Axis Adjustment
-            st.subheader("Step 4: Adjust X-Axis Range")
-            xc1, xc2 = st.columns(2)
-            with xc1: max_neg = st.number_input("Left Side Max (NEG)", 0, 10000, 1000, 100)
-            with xc2: max_pos = st.number_input("Right Side Max (POS)", 100, 10000, 1000, 100)
-            
-            ax.set_xlim(-max_neg, max_pos)
-            ticks = ax.get_xticks()
-            ax.set_xticklabels([str(abs(int(t))) for t in ticks])
-            
-            # --- ADD LABELS BACK IN (Standard Font) ---
-            ymin, ymax = ax.get_ylim()
-            label_y = -0.07 * ymax 
-            
-            ax.text(-max_neg * 0.5, label_y, "Negatively Buoyant Particles", 
-                    ha="center", va="top", fontsize=12, color="black")
-            
-            ax.text(max_pos * 0.5, label_y, "Positively Buoyant Particles", 
-                    ha="center", va="top", fontsize=12, color="black")
-            # --------------------------
-
-            ax.legend(loc="upper right", frameon=True).get_frame().set_linewidth(0.8)
-            
-            plt.tight_layout()
+            style_axes(ax, plot_title)
             st.pyplot(fig)
 
+            # -------------------------------------------------------
+            # Plot 2 – Normalized (peak = 1)
+            # -------------------------------------------------------
+            st.subheader("Normalized Concentration Plot (peak = 1)")
+            fig2, ax2 = plt.subplots(figsize=(10, 7))
+
+            for filename, df, buoyancy_type in histogram_data:
+                df_clean = df.dropna(subset=["Bin Center", "Average"])
+                x = df_clean["Bin Center"] * 1000
+                y = df_clean["Average"]
+
+                # Normalize so the maximum value = 1
+                peak = y.max()
+                if peak > 0:
+                    y = y / peak
+                else:
+                    y = y  # avoid divide-by-zero; leave as-is
+
+                if buoyancy_type == "NEG":
+                    x = -x
+
+                ax2.plot(x, y,
+                         label=dataset_labels[filename],
+                         color=dataset_colors[filename],
+                         linestyle=dataset_line_styles[filename],
+                         linewidth=dataset_line_widths[filename],
+                         marker=None if dataset_markers[filename] == "None" else dataset_markers[filename],
+                         markersize=dataset_marker_sizes[filename])
+
+            ax2.set_ylabel("Normalized Concentration (peak = 1)", fontsize=12)
+            norm_title = (plot_title + " – Normalized").strip(" –") if plot_title else "Normalized"
+            style_axes(ax2, norm_title)
+            st.pyplot(fig2)
+
+            # -------------------------------------------------------
             # Summary Table
+            # -------------------------------------------------------
             combined_summary = pd.DataFrame(all_summaries)
             st.subheader("Summary Table (blue - positively buoyant particles, red - negatively buoyant particles)")
 
-            # Define the styling function to color columns based on Buoyancy Type
             def highlight_buoyancy(col):
-                # Retrieve the value from the 'Buoyancy Type' row for the current column
                 buoy_type = col.get('Buoyancy Type', '')
-                
-                # Apply light blue for POS, light red for NEG, default for others
                 if buoy_type == 'POS':
-                    return ['background-color: rgba(0, 119, 255, 0.1)'] * len(col) 
+                    return ['background-color: rgba(0, 119, 255, 0.1)'] * len(col)
                 elif buoy_type == 'NEG':
                     return ['background-color: rgba(255, 0, 0, 0.1)'] * len(col)
                 else:
                     return [''] * len(col)
 
-            # Apply the style across columns (axis=0)
             styled_summary = combined_summary.style.apply(highlight_buoyancy, axis=0)
-            
-            # Render the styled dataframe ONCE
             st.dataframe(styled_summary, use_container_width=True)
 
-            # --- Download Table as Image Feature ---
+            # --- Download Table as Image ---
             def get_table_image_bytes(df):
-                # Build a color matrix matching the shape of the dataframe
                 cell_colors = []
                 for row_idx in range(df.shape[0]):
                     row_colors = []
                     for col_name in df.columns:
                         buoy_type = df.loc['Buoyancy Type', col_name] if 'Buoyancy Type' in df.index else ''
                         if buoy_type == 'POS':
-                            row_colors.append('#e6f2ff')  # Light Blue Hex
+                            row_colors.append('#e6f2ff')
                         elif buoy_type == 'NEG':
-                            row_colors.append('#ffe6e6')  # Light Red Hex
+                            row_colors.append('#ffe6e6')
                         else:
-                            row_colors.append('#ffffff')  # White Hex
+                            row_colors.append('#ffffff')
                     cell_colors.append(row_colors)
 
-                # Dynamically calculate exact figure size to prevent stretching/squishing
-                # Width: ~2.5 inches per data column + 2.5 inches for the row labels
-                # Height: ~0.35 inches per row (including header)
                 fig_width = 2.5 * df.shape[1] + 2.5
                 fig_height = 0.35 * (df.shape[0] + 1)
                 
                 fig, ax = plt.subplots(figsize=(fig_width, fig_height))
                 ax.axis('off')
                 
-                # Render the table and force it to fill 100% of the bounding box
                 mpl_table = ax.table(
                     cellText=df.values,
                     rowLabels=df.index,
                     colLabels=df.columns,
                     cellColours=cell_colors,
-                    bbox=[0, 0, 1, 1]  # Forces table to stretch to the figure edges
+                    bbox=[0, 0, 1, 1]
                 )
                 
-                # Table formatting
                 mpl_table.auto_set_font_size(False)
                 mpl_table.set_fontsize(12)
                 
-                # Save to in-memory buffer with minimal padding
                 buf = BytesIO()
                 fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0.05, dpi=300)
                 plt.close(fig)
                 buf.seek(0)
                 return buf
 
-            # --- Render the Download Button ---
             st.download_button(
                 label="📷 Download Table as Image",
                 data=get_table_image_bytes(combined_summary),
