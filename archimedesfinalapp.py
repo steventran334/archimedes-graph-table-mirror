@@ -8,6 +8,7 @@ import unicodedata
 from matplotlib.table import Table
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+from matplotlib.ticker import FuncFormatter
 import re  # Regex for grouping filenames
 import numpy as np
 
@@ -67,6 +68,44 @@ def calculate_pdi(mean_nm_str, stdev_nm_str):
     except (ValueError, TypeError):
         return "N/A"
 
+def get_bin_geometry(df):
+    """
+    Return (left_edges_nm, widths_nm, heights) for bar plotting.
+
+    Uses the 'Bin Start' column when available:
+      width_i = BinStart_{i+1} - BinStart_i   (exact for contiguous bins)
+      last width = 2 * (BinCenter_last - BinStart_last)
+    Falls back to spacing between 'Bin Center' values if 'Bin Start' is missing.
+    """
+    d = df.dropna(subset=["Bin Center", "Average"]).sort_values("Bin Center")
+    if d.empty:
+        return None
+
+    centers = d["Bin Center"].to_numpy(dtype=float) * 1000  # µm -> nm
+    heights = d["Average"].to_numpy(dtype=float)
+
+    if "Bin Start" in d.columns and d["Bin Start"].notna().all():
+        starts = d["Bin Start"].to_numpy(dtype=float) * 1000
+        last_w = 2 * (centers[-1] - starts[-1])
+        widths = np.append(np.diff(starts), last_w) if len(starts) > 1 else np.array([last_w])
+    else:
+        if len(centers) > 1:
+            gaps = np.diff(centers)
+            widths = np.append(gaps, gaps[-1])
+        else:
+            widths = np.array([1.0])
+        starts = centers - widths / 2
+
+    # Guard against zero/negative widths from malformed rows
+    valid = widths > 0
+    return starts[valid], widths[valid], heights[valid]
+
+def fig_to_png_bytes(fig, dpi=300):
+    buf = BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", dpi=dpi)
+    buf.seek(0)
+    return buf
+
 # --- Upload multiple CSVs ---
 raw_uploaded_files = st.file_uploader("Upload one or more CSV files", type="csv", accept_multiple_files=True)
 
@@ -74,22 +113,22 @@ if raw_uploaded_files:
     # --- FILE REORDERING FEATURE ---
     file_dict = {f.name: f for f in raw_uploaded_files}
     file_names = list(file_dict.keys())
-    
+
     st.subheader("Step 1: Define File Order & Selection")
-    
+
     ordered_filenames = st.multiselect(
         "Select files in the order you want them to appear (click to add)",
         options=file_names,
-        default=None,  
+        default=None,
         help="Files will appear in the legend and table in the order you select them here."
     )
-        
+
     uploaded_files = [file_dict[name] for name in ordered_filenames]
 
     all_summaries = {}
     histogram_data = []
     dataset_labels = {}
-    
+
     if uploaded_files:
         st.subheader("Step 2: Customize Dataset Names")
         for uploaded_file in uploaded_files:
@@ -100,7 +139,7 @@ if raw_uploaded_files:
 
         for uploaded_file in uploaded_files:
             filename = uploaded_file.name
-            uploaded_file.seek(0) 
+            uploaded_file.seek(0)
             content = uploaded_file.read().decode("utf-8").splitlines()
 
             idx_summary = find_index(content, "SUMMARY DATA")
@@ -118,10 +157,14 @@ if raw_uploaded_files:
             particle_distribution_lines = content[idx_dist_header:]
 
             df_dist = pd.read_csv(io.StringIO("\n".join(particle_distribution_lines)))
-            df_dist = df_dist[['Bin Center', 'Average']].copy()
+            # Keep Bin Start (if present) so the histogram can use true bin edges
+            keep_cols = ['Bin Center', 'Average'] + (['Bin Start'] if 'Bin Start' in df_dist.columns else [])
+            df_dist = df_dist[keep_cols].copy()
             df_dist = df_dist[~df_dist['Bin Center'].astype(str).str.contains('<|>')]
             df_dist['Bin Center'] = pd.to_numeric(df_dist['Bin Center'], errors='coerce')
             df_dist['Average'] = pd.to_numeric(df_dist['Average'], errors='coerce')
+            if 'Bin Start' in df_dist.columns:
+                df_dist['Bin Start'] = pd.to_numeric(df_dist['Bin Start'], errors='coerce')
 
             def convert_um_to_nm(value):
                 try: return str(int(round(float(value) * 1000)))
@@ -160,45 +203,45 @@ if raw_uploaded_files:
 
         # --- Color selection with Automatic Pairing ---
         st.subheader("Step 3: Appearance Settings")
-        
+
         generic_colors = {
-            "Red": "#d62728", "Blue": "#1f77b4", "Green": "#2ca02c", 
-            "Purple": "#9467bd", "Black": "#000000", "Orange": "#ff7f0e", 
-            "Brown": "#8c564b", "Pink": "#e377c2", "Olive": "#bcbd22", 
+            "Red": "#d62728", "Blue": "#1f77b4", "Green": "#2ca02c",
+            "Purple": "#9467bd", "Black": "#000000", "Orange": "#ff7f0e",
+            "Brown": "#8c564b", "Pink": "#e377c2", "Olive": "#bcbd22",
             "Cyan": "#17becf", "Gray": "#7f7f7f"
         }
         generic_color_names = list(generic_colors.keys())
         default_cycle = ["Red", "Blue", "Green", "Purple", "Black", "Orange", "Brown"]
-        
+
         unique_groups = []
         group_map = {}
-        
+
         for filename, _, _ in histogram_data:
             label = dataset_labels[filename]
             base_name = re.sub(r'[\s_-]*\b(POS|NEG)\b[\s_-]*', '', label, flags=re.IGNORECASE).strip()
             if base_name not in unique_groups:
                 unique_groups.append(base_name)
             group_map[filename] = base_name
-        
+
         dataset_colors, dataset_markers, dataset_marker_sizes, dataset_line_styles, dataset_line_widths = {}, {}, {}, {}, {}
-        
+
         for i, (filename, _, _) in enumerate(histogram_data):
             label = dataset_labels[filename]
             base_group = group_map[filename]
             group_index = unique_groups.index(base_group)
             default_color_name = default_cycle[group_index % len(default_cycle)]
-            
+
             col_c1, col_c2, col_c3, col_c4, col_c5 = st.columns([2, 1, 1, 1, 1])
-            
+
             with col_c1:
                 selected_color = st.selectbox(
-                    f"Color: {label}", 
-                    generic_color_names, 
-                    index=generic_color_names.index(default_color_name), 
+                    f"Color: {label}",
+                    generic_color_names,
+                    index=generic_color_names.index(default_color_name),
                     key=f"c_{filename}"
                 )
                 dataset_colors[filename] = generic_colors[selected_color]
-                
+
             with col_c2:
                 dataset_markers[filename] = st.selectbox(f"Marker: {label}", ["None", "o", "^", "s", "D", "*"], key=f"m_{filename}")
             with col_c3:
@@ -210,7 +253,7 @@ if raw_uploaded_files:
 
         plot_title = st.text_input("Plot Title:", value="")
 
-        # --- X-Axis Range (shared between both plots) ---
+        # --- X-Axis Range (shared between all plots) ---
         st.subheader("Step 4: Adjust X-Axis Range")
         xc1, xc2 = st.columns(2)
         with xc1: max_neg = st.number_input("Left Side Max (NEG)", 0, 10000, 1000, 100)
@@ -232,6 +275,42 @@ if raw_uploaded_files:
             label_y = -0.07 * ymax
             ax.text(-max_neg * 0.5, label_y, "Negatively Buoyant Particles",
                     ha="center", va="top", fontsize=12, color="black")
+            ax.text(max_pos * 0.5, label_y, "Positively Buoyant Particles",
+                    ha="center", va="top", fontsize=12, color="black")
+
+            ax.legend(loc="upper right", frameon=True).get_frame().set_linewidth(0.8)
+            plt.tight_layout()
+
+        # -------------------------------------------------------
+        # Helper: histogram styling (matches reference figure format)
+        #   - light dashed horizontal gridlines behind bars
+        #   - top/right spines hidden
+        #   - y ticks in scientific notation (e.g. 4.5e+07) for raw data
+        # -------------------------------------------------------
+        def style_hist_axes(ax, title_str, ylabel, sci_y=True):
+            ax.axvline(0, color="black", linestyle="--", linewidth=1)
+            ax.set_xlim(-max_neg, max_pos)
+            ax.set_ylim(bottom=0)
+            ax.set_xlabel("Diameter [nm]", fontsize=12, labelpad=30)
+            ax.set_ylabel(ylabel, fontsize=12)
+            ax.set_title(title_str, fontsize=14, weight="bold")
+
+            # Mirrored axis: show absolute values on both sides
+            ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{abs(v):g}"))
+            if sci_y:
+                ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:.1e}"))
+
+            ax.yaxis.grid(True, linestyle="--", color="#d9d9d9", linewidth=0.8)
+            ax.xaxis.grid(False)
+            ax.set_axisbelow(True)
+            for side in ("top", "right"):
+                ax.spines[side].set_visible(False)
+
+            ymin, ymax = ax.get_ylim()
+            label_y = -0.07 * ymax
+            if max_neg > 0:
+                ax.text(-max_neg * 0.5, label_y, "Negatively Buoyant Particles",
+                        ha="center", va="top", fontsize=12, color="black")
             ax.text(max_pos * 0.5, label_y, "Positively Buoyant Particles",
                     ha="center", va="top", fontsize=12, color="black")
 
@@ -299,6 +378,62 @@ if raw_uploaded_files:
             st.pyplot(fig2)
 
             # -------------------------------------------------------
+            # Plot 3 – Histogram view (mirrored POS/NEG bars)
+            # -------------------------------------------------------
+            st.subheader("Histogram View (mirrored POS/NEG)")
+            hc1, hc2, hc3 = st.columns(3)
+            with hc1:
+                hist_mode = st.radio("Y-axis", ["Raw concentration", "Normalized (peak = 1)"],
+                                     horizontal=True, key="hist_mode")
+            with hc2:
+                hist_alpha = st.slider("Bar opacity", 0.2, 1.0, 0.6, 0.05, key="hist_alpha",
+                                       help="Lower this when several same-side datasets overlap.")
+            with hc3:
+                hist_edges = st.checkbox("Dark bar outlines", value=True, key="hist_edges")
+
+            normalize_hist = hist_mode.startswith("Normalized")
+            fig3, ax3 = plt.subplots(figsize=(10, 7))
+
+            for filename, df, buoyancy_type in histogram_data:
+                geom = get_bin_geometry(df)
+                if geom is None:
+                    st.warning(f"No valid bins in {filename}; skipped in histogram.")
+                    continue
+                starts_nm, widths_nm, heights = geom
+
+                if normalize_hist:
+                    peak = heights.max()
+                    if peak > 0:
+                        heights = heights / peak
+
+                # NEG bars are mirrored: the bin [s, s+w] maps to [-(s+w), -s]
+                lefts = -(starts_nm + widths_nm) if buoyancy_type == "NEG" else starts_nm
+
+                ax3.bar(lefts, heights, width=widths_nm, align="edge",
+                        color=dataset_colors[filename],
+                        alpha=hist_alpha,
+                        edgecolor="#1a1a1a" if hist_edges else "none",
+                        linewidth=0.5,
+                        label=dataset_labels[filename])
+
+            if normalize_hist:
+                hist_ylabel = "Normalized Concentration (peak = 1)"
+                hist_title = (plot_title + " – Histogram (Normalized)").strip(" –") if plot_title else "Histogram (Normalized)"
+            else:
+                hist_ylabel = "Concentration [#/mL]"
+                hist_title = (plot_title + " – Histogram").strip(" –") if plot_title else "Histogram"
+
+            style_hist_axes(ax3, hist_title, hist_ylabel, sci_y=not normalize_hist)
+            st.pyplot(fig3)
+
+            st.download_button(
+                label="📊 Download Histogram as PNG",
+                data=fig_to_png_bytes(fig3),
+                file_name="Archimedes_Histogram.png",
+                mime="image/png"
+            )
+
+            # -------------------------------------------------------
             # Summary Table
             # -------------------------------------------------------
             combined_summary = pd.DataFrame(all_summaries)
@@ -333,10 +468,10 @@ if raw_uploaded_files:
 
                 fig_width = 2.5 * df.shape[1] + 2.5
                 fig_height = 0.35 * (df.shape[0] + 1)
-                
+
                 fig, ax = plt.subplots(figsize=(fig_width, fig_height))
                 ax.axis('off')
-                
+
                 mpl_table = ax.table(
                     cellText=df.values,
                     rowLabels=df.index,
@@ -344,10 +479,10 @@ if raw_uploaded_files:
                     cellColours=cell_colors,
                     bbox=[0, 0, 1, 1]
                 )
-                
+
                 mpl_table.auto_set_font_size(False)
                 mpl_table.set_fontsize(12)
-                
+
                 buf = BytesIO()
                 fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0.05, dpi=300)
                 plt.close(fig)
