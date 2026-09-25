@@ -106,6 +106,14 @@ def fig_to_png_bytes(fig, dpi=300):
     buf.seek(0)
     return buf
 
+def fig_to_svg_bytes(fig):
+    # Keep text as editable <text> elements (not paths) for Illustrator/Inkscape
+    with plt.rc_context({"svg.fonttype": "none"}):
+        buf = BytesIO()
+        fig.savefig(buf, format="svg", bbox_inches="tight")
+    buf.seek(0)
+    return buf
+
 # --- Upload multiple CSVs ---
 raw_uploaded_files = st.file_uploader("Upload one or more CSV files", type="csv", accept_multiple_files=True)
 
@@ -418,20 +426,29 @@ if raw_uploaded_files:
 
             if normalize_hist:
                 hist_ylabel = "Normalized Concentration (peak = 1)"
-                hist_title = (plot_title + " – Histogram (Normalized)").strip(" –") if plot_title else "Histogram (Normalized)"
+                hist_title = (plot_title + " – Normalized").strip(" –") if plot_title else "Normalized"
             else:
                 hist_ylabel = "Concentration [#/mL]"
-                hist_title = (plot_title + " – Histogram").strip(" –") if plot_title else "Histogram"
+                hist_title = plot_title
 
             style_hist_axes(ax3, hist_title, hist_ylabel, sci_y=not normalize_hist)
             st.pyplot(fig3)
 
-            st.download_button(
-                label="📊 Download Histogram as PNG",
-                data=fig_to_png_bytes(fig3),
-                file_name="Archimedes_Histogram.png",
-                mime="image/png"
-            )
+            dl1, dl2 = st.columns(2)
+            with dl1:
+                st.download_button(
+                    label="📊 Download Histogram as SVG",
+                    data=fig_to_svg_bytes(fig3),
+                    file_name="Archimedes_Histogram.svg",
+                    mime="image/svg+xml"
+                )
+            with dl2:
+                st.download_button(
+                    label="📊 Download Histogram as PNG",
+                    data=fig_to_png_bytes(fig3),
+                    file_name="Archimedes_Histogram.png",
+                    mime="image/png"
+                )
 
             # -------------------------------------------------------
             # Summary Table
